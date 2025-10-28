@@ -8,15 +8,17 @@ import net.neoforged.fml.common.EventBusSubscriber;
 
 import static com.zivalez.tpshudneoforge.tpshudneoforge.MODID;
 
+// NetInit.java
 @EventBusSubscriber(modid = MODID, bus = EventBusSubscriber.Bus.MOD)
 public class NetInit {
     @SubscribeEvent
     public static void register(final RegisterPayloadHandlersEvent evt) {
-        PayloadRegistrar reg = evt.registrar(MODID);
+        final PayloadRegistrar reg = evt.registrar(MODID);
         reg.playBidirectional(
-            CommonHandshakePayload.TYPE,
-            CommonHandshakePayload.CODEC,
-            (payload, ctx) -> { /* no-op or set a flag */ }
+                CommonHandshakePayload.TYPE,
+                CommonHandshakePayload.CODEC,
+                (payload, ctx) -> { /* no-op */ }
         );
     }
 }
+

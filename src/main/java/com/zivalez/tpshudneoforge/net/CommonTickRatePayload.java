@@ -1,22 +1,26 @@
+// src/main/java/com/zivalez/tpshudneoforge/net/CommonTickRatePayload.java
 package com.zivalez.tpshudneoforge.net;
 
 import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 
-public record CommonTickRatePayload(double tickRate, boolean convertedFromTps) implements CustomPacketPayload {
-    public static final ResourceLocation RL = ResourceLocation.fromNamespaceAndPath("tpshudneoforge", "tps");
-    public static final Type<CommonTickRatePayload> ID = new Type<>(RL);
+import static com.zivalez.tpshudneoforge.tpshudneoforge.MODID;
+
+public record CommonTickRatePayload(float tps) implements CustomPacketPayload {
+    public static final Type<CommonTickRatePayload> TYPE =
+            new Type<>(ResourceLocation.fromNamespaceAndPath(MODID, "tick_rate"));
 
     public static final StreamCodec<RegistryFriendlyByteBuf, CommonTickRatePayload> CODEC =
-            CustomPacketPayload.codec((p, buf) -> {
-                buf.writeDouble(p.tickRate());
-                buf.writeBoolean(p.convertedFromTps());
-            }, buf -> new CommonTickRatePayload(buf.readDouble(), buf.readBoolean()));
+            StreamCodec.composite(
+                    ByteBufCodecs.FLOAT, CommonTickRatePayload::tps,
+                    CommonTickRatePayload::new
+            );
 
     @Override
     public Type<CommonTickRatePayload> type() {
-        return ID;
+        return TYPE;
     }
 }

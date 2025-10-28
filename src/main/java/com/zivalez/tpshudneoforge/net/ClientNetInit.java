@@ -9,18 +9,18 @@ import net.neoforged.api.distmarker.Dist;
 
 import static com.zivalez.tpshudneoforge.tpshudneoforge.MODID;
 
+// ClientNetInit.java
 @EventBusSubscriber(modid = MODID, value = Dist.CLIENT, bus = EventBusSubscriber.Bus.MOD)
 public class ClientNetInit {
     @SubscribeEvent
     public static void register(final RegisterPayloadHandlersEvent evt) {
-        PayloadRegistrar reg = evt.registrar(MODID);
-
+        final PayloadRegistrar reg = evt.registrar(MODID);
         reg.playToClient(
-            CommonTickRatePayload.TYPE,
-            CommonTickRatePayload.CODEC,
-            (payload, ctx) -> ctx.enqueueWork(() -> {
-
-            })
+                CommonTickRatePayload.TYPE,
+                CommonTickRatePayload.CODEC,
+                (payload, ctx) -> ctx.enqueueWork(() -> {
+                })
         );
     }
 }
+
