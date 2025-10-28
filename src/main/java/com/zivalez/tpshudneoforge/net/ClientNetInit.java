@@ -1,22 +1,26 @@
-// src/main/java/com/zivalez/tpshudneoforge/net/NetInit.java
+// src/main/java/com/zivalez/tpshudneoforge/net/ClientNetInit.java
 package com.zivalez.tpshudneoforge.net;
 
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.api.distmarker.Dist;
 
 import static com.zivalez.tpshudneoforge.tpshudneoforge.MODID;
 
-@EventBusSubscriber(modid = MODID, bus = EventBusSubscriber.Bus.MOD)
-public class NetInit {
+@EventBusSubscriber(modid = MODID, value = Dist.CLIENT, bus = EventBusSubscriber.Bus.MOD)
+public class ClientNetInit {
     @SubscribeEvent
     public static void register(final RegisterPayloadHandlersEvent evt) {
         PayloadRegistrar reg = evt.registrar(MODID);
-        reg.playBidirectional(
-            CommonHandshakePayload.TYPE,
-            CommonHandshakePayload.CODEC,
-            (payload, ctx) -> { /* no-op or set a flag */ }
+
+        reg.playToClient(
+            CommonTickRatePayload.TYPE,
+            CommonTickRatePayload.CODEC,
+            (payload, ctx) -> ctx.enqueueWork(() -> {
+
+            })
         );
     }
 }
