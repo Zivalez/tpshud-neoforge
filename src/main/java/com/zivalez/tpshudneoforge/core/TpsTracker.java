@@ -40,7 +40,6 @@ public final class TpsTracker {
             if (dtTicks > 0 && dtNanos > 0) {
                 double tps = (dtTicks * 1_000_000_000d) / dtNanos;
                 if (tps > 20.0) tps = 20.0;
-
                 pushSample(tps);
             }
         }
@@ -58,8 +57,14 @@ public final class TpsTracker {
         cachedTps = sum / samples.size();
     }
 
-    public static double getTps() {
-        return cachedTps;
+    public static float getTps() {
+        return Double.isNaN(cachedTps) ? Float.NaN : (float) cachedTps;
+    }
+
+    public static float getMspt() {
+        if (Double.isNaN(cachedTps)) return Float.NaN;
+        if (cachedTps <= 0.0) return Float.POSITIVE_INFINITY;
+        return (float) (1000.0 / cachedTps);
     }
 
     public static String getFormatted() {
