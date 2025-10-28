@@ -1,15 +1,15 @@
 {
   "required": true,
-  "package": "com.zivalez.tpshudneoforge.mixin",
   "compatibilityLevel": "JAVA_21",
+  "package": "com.zivalez.tpshudneoforge.mixin",
   "mixins": [],
+  "client": [
+    "ClientPacketListenerMixin"
+  ],
   "injectors": {
     "defaultRequire": 1
   },
   "overwrites": {
     "requireAnnotations": true
-  },
-  "client": [
-    "com.zivalez.tpshudneoforge.mixin.ClientPacketListenerMixin"
-  ]
+  }
 }
