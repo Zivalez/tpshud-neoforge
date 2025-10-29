@@ -3,7 +3,6 @@
 [![Minecraft](https://img.shields.io/badge/Minecraft-1.21.1-green.svg)](https://minecraft.net)
 [![NeoForge](https://img.shields.io/badge/NeoForge-21.1.213-orange.svg)](https://neoforged.net)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/Version-1.0.0-blue.svg)](../../releases)
 [![Build](https://github.com/Zivalez/tpshud-neoforge/actions/workflows/build.yml/badge.svg)](https://github.com/Zivalez/tpshud-neoforge/actions/workflows/build.yml)
 
 **Author:** Zivalez  
