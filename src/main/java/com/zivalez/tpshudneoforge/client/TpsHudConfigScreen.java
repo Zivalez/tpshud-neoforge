@@ -1,13 +1,18 @@
-package com.zivalez.tpshudneoforge.client.config;
+package com.zivalez.tpshudneoforge.client;
 
 import com.zivalez.tpshudneoforge.config.ConfigManager;
 import com.zivalez.tpshudneoforge.config.TpsHudConfig;
+import com.zivalez.tpshudneoforge.config.TpsHudConfig.Anchor;
+import com.zivalez.tpshudneoforge.config.TpsHudConfig.Format;
+import com.zivalez.tpshudneoforge.config.TpsHudConfig.Mode;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.CycleButton;
 import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
+import net.minecraft.util.Mth;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -16,9 +21,8 @@ import java.util.Locale;
 public class TpsHudConfigScreen extends Screen {
 
     private final Screen parent;
-    private final List<net.minecraft.client.gui.components.AbstractWidget> widgets = new ArrayList<>();
+    private final List<AbstractWidget> widgets = new ArrayList<>();
     private final List<Label> labels = new ArrayList<>();
-
     private ModelView mv;
 
     public TpsHudConfigScreen(Screen parent) {
@@ -35,187 +39,221 @@ public class TpsHudConfigScreen extends Screen {
         this.mv = new ModelView(cfg);
 
         int left = this.width / 2 - 160;
-        int y = 30;
+        int y = 28;
         int w = 320;
         int gap = 6;
 
-        // Title
+        // ===== Title
         labels.add(new Label(left, y, Component.literal("TPS HUD – Settings")));
         y += 14 + gap;
 
-        // Enabled
+        // ===== Enabled
         labels.add(new Label(left, y + 5, Component.literal("Enabled")));
         var enabledBtn = CycleButton.booleanBuilder(Component.literal("ON"), Component.literal("OFF"))
-                .withInitialValue(mv.enabled)
-                .displayOnlyValue(true)
-                .create(left + 140, y, w - 140, 20, Component.empty());
+                .displayOnlyValue()
+                .create(left + 140, y, w - 140, 20, Component.empty(),
+                        (btn, value) -> mv.enabled = value);
         enabledBtn.setValue(mv.enabled);
-        enabledBtn.setCallback((b, v) -> mv.enabled = v);
         widgets.add(enabledBtn);
         y += 22 + gap;
 
-        // Anchor
+        // ===== Anchor
         labels.add(new Label(left, y + 5, Component.literal("Anchor")));
-        var anchorBtn = CycleButton.<TpsHudConfig.Anchor>builder(a -> Component.literal(a.name().replace('_','-')))
-                .withValues(TpsHudConfig.Anchor.values())
-                .withInitialValue(mv.anchor)
-                .create(left + 140, y, w - 140, 20, Component.empty());
+        var anchorBtn = CycleButton.<Anchor>builder(a -> Component.literal(a.name().replace('_', '-')))
+                .withValues(Anchor.values())
+                .displayOnlyValue()
+                .create(left + 140, y, w - 140, 20, Component.empty(),
+                        (btn, value) -> mv.anchor = value);
         anchorBtn.setValue(mv.anchor);
-        anchorBtn.setCallback((b, v) -> mv.anchor = v);
         widgets.add(anchorBtn);
         y += 22 + gap;
 
-        // Padding
+        // ===== Padding
         labels.add(new Label(left, y + 5, Component.literal("Padding (px)")));
         var padBox = new EditBox(this.font, left + 140, y, w - 140, 20, Component.empty());
         padBox.setValue(String.valueOf(mv.padding));
         padBox.setResponder(s -> {
-            try { mv.padding = Math.max(0, Math.min(64, Integer.parseInt(s.trim()))); padBox.setTextColor(0xE0E0E0); }
+            try { mv.padding = clampInt(Integer.parseInt(s.trim()), 0, 64); padBox.setTextColor(0xE0E0E0); }
             catch (Exception ex) { padBox.setTextColor(0xFF5555); }
         });
         widgets.add(padBox);
         y += 22 + gap;
 
-        // Scale
+        // ===== Scale (%)
         labels.add(new Label(left, y + 5, Component.literal("Scale (%)")));
-        var scaleDec = Button.builder(Component.literal("-"), b -> { mv.scale = Math.max(0.5f, mv.scale - 0.05f); })
-                .bounds(left + 140, y, 20, 20).build();
+        var scaleDec = Button.builder(Component.literal("-"), b -> {
+                    mv.scale = Mth.clamp(mv.scale - 0.05f, 0.5f, 2.0f);
+                })
+                .bounds(left + 140, y, 20, 20)
+                .build();
+
         var scaleBox = new EditBox(this.font, left + 162, y, w - 140 - 44, 20, Component.empty());
         scaleBox.setValue(String.valueOf(Math.round(mv.scale * 100)));
         scaleBox.setResponder(s -> {
-            try { int p = Integer.parseInt(s.trim()); mv.scale = Math.max(50, Math.min(200, p)) / 100f; scaleBox.setTextColor(0xE0E0E0); }
-            catch (Exception ex) { scaleBox.setTextColor(0xFF5555); }
+            try {
+                int p = Integer.parseInt(s.trim());
+                mv.scale = Mth.clamp(p / 100f, 0.5f, 2.0f);
+                scaleBox.setTextColor(0xE0E0E0);
+            } catch (Exception ex) {
+                scaleBox.setTextColor(0xFF5555);
+            }
         });
-        var scaleInc = Button.builder(Component.literal("+"), b -> { mv.scale = Math.min(2.0f, mv.scale + 0.05f); })
-                .bounds(left + w - 22, y, 22, 20).build();
-        widgets.add(scaleDec); widgets.add(scaleBox); widgets.add(scaleInc);
+
+        var scaleInc = Button.builder(Component.literal("+"), b -> {
+                    mv.scale = Mth.clamp(mv.scale + 0.05f, 0.5f, 2.0f);
+                })
+                .bounds(left + w - 22, y, 22, 20)
+                .build();
+
+        widgets.add(scaleDec);
+        widgets.add(scaleBox);
+        widgets.add(scaleInc);
         y += 22 + gap;
 
-        // Precision
+        // ===== Precision
         labels.add(new Label(left, y + 5, Component.literal("Precision (decimals)")));
         var precisionBtn = CycleButton.<Integer>builder(v -> Component.literal(String.valueOf(v)))
-                .withValues(0,1,2,3)
-                .withInitialValue(mv.precision)
-                .create(left + 140, y, w - 140, 20, Component.empty());
-        precisionBtn.setCallback((b, v) -> mv.precision = v);
+                .withValues(0, 1, 2, 3)
+                .displayOnlyValue()
+                .create(left + 140, y, w - 140, 20, Component.empty(),
+                        (btn, value) -> mv.precision = value);
+        precisionBtn.setValue(mv.precision);
         widgets.add(precisionBtn);
         y += 22 + gap;
 
-        // Format
+        // ===== Format
         labels.add(new Label(left, y + 5, Component.literal("Format")));
-        var formatBtn = CycleButton.<TpsHudConfig.Format>builder(v -> Component.literal(v.name()))
-                .withValues(TpsHudConfig.Format.values())
-                .withInitialValue(mv.format)
-                .create(left + 140, y, w - 140, 20, Component.empty());
-        formatBtn.setCallback((b, v) -> mv.format = v);
+        var formatBtn = CycleButton.<Format>builder(v -> Component.literal(v.name()))
+                .withValues(Format.values())
+                .displayOnlyValue()
+                .create(left + 140, y, w - 140, 20, Component.empty(),
+                        (btn, value) -> mv.format = value);
+        formatBtn.setValue(mv.format);
         widgets.add(formatBtn);
         y += 22 + gap;
 
-        // Smoothing Window
+        // ===== Smoothing Window
         labels.add(new Label(left, y + 5, Component.literal("Smoothing Window (samples)")));
         var smoothBox = new EditBox(this.font, left + 140, y, w - 140, 20, Component.empty());
         smoothBox.setValue(String.valueOf(mv.smoothingWindow));
         smoothBox.setResponder(s -> {
-            try { mv.smoothingWindow = Math.max(5, Math.min(240, Integer.parseInt(s.trim()))); smoothBox.setTextColor(0xE0E0E0); }
+            try { mv.smoothingWindow = clampInt(Integer.parseInt(s.trim()), 5, 240); smoothBox.setTextColor(0xE0E0E0); }
             catch (Exception ex) { smoothBox.setTextColor(0xFF5555); }
         });
         widgets.add(smoothBox);
         y += 22 + gap;
 
-        // Auto-hide F3
+        // ===== Auto-hide F3
         labels.add(new Label(left, y + 5, Component.literal("Auto-hide when F3 open")));
         var autoHideBtn = CycleButton.booleanBuilder(Component.literal("ON"), Component.literal("OFF"))
-                .withInitialValue(mv.autoHideF3)
-                .displayOnlyValue(true)
-                .create(left + 140, y, w - 140, 20, Component.empty());
-        autoHideBtn.setCallback((b, v) -> mv.autoHideF3 = v);
+                .displayOnlyValue()
+                .create(left + 140, y, w - 140, 20, Component.empty(),
+                        (btn, value) -> mv.autoHideF3 = value);
+        autoHideBtn.setValue(mv.autoHideF3);
         widgets.add(autoHideBtn);
         y += 22 + gap;
 
-        // Mode
+        // ===== Mode
         labels.add(new Label(left, y + 5, Component.literal("Display Mode")));
-        var modeBtn = CycleButton.<TpsHudConfig.Mode>builder(v -> Component.literal(v.name()))
-                .withValues(TpsHudConfig.Mode.values())
-                .withInitialValue(mv.displayMode)
-                .create(left + 140, y, w - 140, 20, Component.empty());
-        modeBtn.setCallback((b, v) -> mv.displayMode = v);
+        var modeBtn = CycleButton.<Mode>builder(v -> Component.literal(v.name()))
+                .withValues(Mode.values())
+                .displayOnlyValue()
+                .create(left + 140, y, w - 140, 20, Component.empty(),
+                        (btn, value) -> mv.displayMode = value);
+        modeBtn.setValue(mv.displayMode);
         widgets.add(modeBtn);
         y += 22 + gap;
 
-        // Thresholds Titles
-        labels.add(new Label(left, y + 5, Component.literal("TPS Thresholds"))); y += 14 + gap;
+        // ===== TPS Thresholds
+        labels.add(new Label(left, y + 5, Component.literal("TPS Thresholds")));
+        y += 14 + gap;
 
-        // TPS warn/bad
         labels.add(new Label(left, y + 5, Component.literal("Warn if TPS ≤")));
-        var tpsWarn = new EditBox(this.font, left + 140, y, (w - 140)/2 - 4, 20, Component.empty());
+        var tpsWarn = new EditBox(this.font, left + 140, y, (w - 140) / 2 - 4, 20, Component.empty());
         tpsWarn.setValue(trimDouble(mv.thresh.tpsWarn));
         tpsWarn.setResponder(s -> validateDoubleBox(tpsWarn, s, v -> mv.thresh.tpsWarn = clamp(v, 0, 20)));
         widgets.add(tpsWarn);
 
-        labels.add(new Label(left + 140 + (w - 140)/2 + 8, y + 5, Component.literal("Bad if TPS ≤")));
-        var tpsBad = new EditBox(this.font, left + 140 + (w - 140)/2 + 8 + 90, y, (w - 140) - ((w - 140)/2 + 8 + 90), 20, Component.empty());
+        labels.add(new Label(left + 140 + (w - 140) / 2 + 8, y + 5, Component.literal("Bad if TPS ≤")));
+        var tpsBad = new EditBox(this.font,
+                left + 140 + (w - 140) / 2 + 8 + 90,
+                y,
+                (w - 140) - ((w - 140) / 2 + 8 + 90),
+                20,
+                Component.empty());
         tpsBad.setValue(trimDouble(mv.thresh.tpsBad));
         tpsBad.setResponder(s -> validateDoubleBox(tpsBad, s, v -> mv.thresh.tpsBad = clamp(v, 0, 20)));
         widgets.add(tpsBad);
         y += 22 + gap;
 
-        // TPS colors
         labels.add(new Label(left, y + 5, Component.literal("TPS Colors (#RRGGBB Good/Warn/Bad)")));
-        var tpsGood = hexBox(left + 140, y, (w - 140 - 16)/3, mv.thresh.tpsGoodColor, v -> mv.thresh.tpsGoodColor = v);
-        var tpsWarnC = hexBox(left + 140 + (w - 140 - 16)/3 + 8, y, (w - 140 - 16)/3, mv.thresh.tpsWarnColor, v -> mv.thresh.tpsWarnColor = v);
-        var tpsBadC = hexBox(left + 140 + 2*((w - 140 - 16)/3) + 16, y, (w - 140 - 16)/3, mv.thresh.tpsBadColor, v -> mv.thresh.tpsBadColor = v);
-        widgets.add(tpsGood); widgets.add(tpsWarnC); widgets.add(tpsBadC);
+        var tpsGood = hexBox(left + 140, y, (w - 140 - 16) / 3, mv.thresh.tpsGoodColor, v -> mv.thresh.tpsGoodColor = v);
+        var tpsWarnC = hexBox(left + 140 + (w - 140 - 16) / 3 + 8, y, (w - 140 - 16) / 3, mv.thresh.tpsWarnColor, v -> mv.thresh.tpsWarnColor = v);
+        var tpsBadC = hexBox(left + 140 + 2 * ((w - 140 - 16) / 3) + 16, y, (w - 140 - 16) / 3, mv.thresh.tpsBadColor, v -> mv.thresh.tpsBadColor = v);
+        widgets.add(tpsGood);
+        widgets.add(tpsWarnC);
+        widgets.add(tpsBadC);
         y += 22 + gap;
 
-        // MSPT
-        labels.add(new Label(left, y + 5, Component.literal("MSPT Thresholds"))); y += 14 + gap;
+        // ===== MSPT Thresholds
+        labels.add(new Label(left, y + 5, Component.literal("MSPT Thresholds")));
+        y += 14 + gap;
 
         labels.add(new Label(left, y + 5, Component.literal("Warn if MSPT ≥")));
-        var msptWarn = new EditBox(this.font, left + 140, y, (w - 140)/2 - 4, 20, Component.empty());
+        var msptWarn = new EditBox(this.font, left + 140, y, (w - 140) / 2 - 4, 20, Component.empty());
         msptWarn.setValue(trimDouble(mv.thresh.msptWarn));
         msptWarn.setResponder(s -> validateDoubleBox(msptWarn, s, v -> mv.thresh.msptWarn = clamp(v, 0, 200)));
         widgets.add(msptWarn);
 
-        labels.add(new Label(left + 140 + (w - 140)/2 + 8, y + 5, Component.literal("Bad if MSPT ≥")));
-        var msptBad = new EditBox(this.font, left + 140 + (w - 140)/2 + 8 + 90, y, (w - 140) - ((w - 140)/2 + 8 + 90), 20, Component.empty());
+        labels.add(new Label(left + 140 + (w - 140) / 2 + 8, y + 5, Component.literal("Bad if MSPT ≥")));
+        var msptBad = new EditBox(this.font,
+                left + 140 + (w - 140) / 2 + 8 + 90,
+                y,
+                (w - 140) - ((w - 140) / 2 + 8 + 90),
+                20,
+                Component.empty());
         msptBad.setValue(trimDouble(mv.thresh.msptBad));
         msptBad.setResponder(s -> validateDoubleBox(msptBad, s, v -> mv.thresh.msptBad = clamp(v, 0, 200)));
         widgets.add(msptBad);
         y += 22 + gap;
 
         labels.add(new Label(left, y + 5, Component.literal("MSPT Colors (#RRGGBB Good/Warn/Bad)")));
-        var msptGood = hexBox(left + 140, y, (w - 140 - 16)/3, mv.thresh.msptGoodColor, v -> mv.thresh.msptGoodColor = v);
-        var msptWarnC = hexBox(left + 140 + (w - 140 - 16)/3 + 8, y, (w - 140 - 16)/3, mv.thresh.msptWarnColor, v -> mv.thresh.msptWarnColor = v);
-        var msptBadC = hexBox(left + 140 + 2*((w - 140 - 16)/3) + 16, y, (w - 140 - 16)/3, mv.thresh.msptBadColor, v -> mv.thresh.msptBadColor = v);
-        widgets.add(msptGood); widgets.add(msptWarnC); widgets.add(msptBadC);
+        var msptGood = hexBox(left + 140, y, (w - 140 - 16) / 3, mv.thresh.msptGoodColor, v -> mv.thresh.msptGoodColor = v);
+        var msptWarnC = hexBox(left + 140 + (w - 140 - 16) / 3 + 8, y, (w - 140 - 16) / 3, mv.thresh.msptWarnColor, v -> mv.thresh.msptWarnColor = v);
+        var msptBadC = hexBox(left + 140 + 2 * ((w - 140 - 16) / 3) + 16, y, (w - 140 - 16) / 3, mv.thresh.msptBadColor, v -> mv.thresh.msptBadColor = v);
+        widgets.add(msptGood);
+        widgets.add(msptWarnC);
+        widgets.add(msptBadC);
         y += 22 + gap;
 
-        // Buttons: Done / Cancel
+        // ===== Buttons
         var done = Button.builder(Component.literal("Done"), b -> {
-            mv.applyTo(ConfigManager.get());
-            ConfigManager.save();
-            onClose();
-        }).bounds(this.width / 2 - 155, this.height - 28, 150, 20).build();
+                    mv.applyTo(ConfigManager.get());
+                    ConfigManager.save();
+                    onClose();
+                })
+                .bounds(this.width / 2 - 155, this.height - 28, 150, 20)
+                .build();
 
         var cancel = Button.builder(Component.literal("Cancel"), b -> onClose())
-                .bounds(this.width / 2 + 5, this.height - 28, 150, 20).build();
+                .bounds(this.width / 2 + 5, this.height - 28, 150, 20)
+                .build();
 
-        widgets.add(done); widgets.add(cancel);
+        widgets.add(done);
+        widgets.add(cancel);
+
+        // Add all widgets to screen
+        widgets.forEach(this::addRenderableWidget);
         super.init();
     }
 
     @Override
     public void render(GuiGraphics gfx, int mouseX, int mouseY, float delta) {
         this.renderBackground(gfx, mouseX, mouseY, delta);
-        for (var w : widgets) w.render(gfx, mouseX, mouseY, delta);
-        for (var l : labels) gfx.drawString(this.font, l.text(), l.x(), l.y(), 0xFFFFFF, false);
+        for (var l : labels) {
+            gfx.drawString(this.font, l.text(), l.x(), l.y(), 0xFFFFFF, false);
+        }
         super.render(gfx, mouseX, mouseY, delta);
-    }
-
-    @Override
-    public void tick() {
-        for (var w : widgets) w.tick();
-        super.tick();
     }
 
     @Override
@@ -229,7 +267,7 @@ public class TpsHudConfigScreen extends Screen {
         var box = new EditBox(this.font, x, y, w, 20, Component.empty());
         box.setValue(init);
         box.setResponder(s -> {
-            String t = s.trim().toUpperCase(Locale.ROOT);
+            String t = s == null ? "" : s.trim().toUpperCase(Locale.ROOT);
             if (t.startsWith("#")) t = t.substring(1);
             boolean ok = t.matches("[0-9A-F]{6}");
             box.setTextColor(ok ? 0xE0E0E0 : 0xFF5555);
@@ -249,7 +287,7 @@ public class TpsHudConfigScreen extends Screen {
     }
 
     private static String trimDouble(double v) {
-        if (Math.abs(v - Math.round(v)) < 1e-6) return String.valueOf((long)Math.round(v));
+        if (Math.abs(v - Math.round(v)) < 1e-6) return String.valueOf((long) Math.round(v));
         return String.valueOf(v);
     }
 
@@ -257,17 +295,20 @@ public class TpsHudConfigScreen extends Screen {
         return Math.max(min, Math.min(max, v));
     }
 
-    // Lightweight copy of config for editing, then apply back
+    private static int clampInt(int v, int min, int max) {
+        return Math.max(min, Math.min(max, v));
+    }
+
     private static final class ModelView {
         public boolean enabled;
-        public TpsHudConfig.Anchor anchor;
+        public Anchor anchor;
         public int padding;
         public float scale;
         public int precision;
-        public TpsHudConfig.Format format;
+        public Format format;
         public int smoothingWindow;
         public boolean autoHideF3;
-        public TpsHudConfig.Mode displayMode;
+        public Mode displayMode;
         public final TpsHudConfig.Thresholds thresh = new TpsHudConfig.Thresholds();
 
         ModelView(TpsHudConfig src) {
@@ -286,6 +327,7 @@ public class TpsHudConfigScreen extends Screen {
             this.thresh.tpsGoodColor = src.thresholds.tpsGoodColor;
             this.thresh.tpsWarnColor = src.thresholds.tpsWarnColor;
             this.thresh.tpsBadColor = src.thresholds.tpsBadColor;
+
             this.thresh.msptWarn = src.thresholds.msptWarn;
             this.thresh.msptBad = src.thresholds.msptBad;
             this.thresh.msptGoodColor = src.thresholds.msptGoodColor;
@@ -309,6 +351,7 @@ public class TpsHudConfigScreen extends Screen {
             dst.thresholds.tpsGoodColor = thresh.tpsGoodColor;
             dst.thresholds.tpsWarnColor = thresh.tpsWarnColor;
             dst.thresholds.tpsBadColor = thresh.tpsBadColor;
+
             dst.thresholds.msptWarn = thresh.msptWarn;
             dst.thresholds.msptBad = thresh.msptBad;
             dst.thresholds.msptGoodColor = thresh.msptGoodColor;

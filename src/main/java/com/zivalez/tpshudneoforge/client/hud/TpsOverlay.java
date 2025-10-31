@@ -7,108 +7,103 @@ import com.zivalez.tpshudneoforge.tpshudneoforge;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.util.Mth;
+import net.minecraft.util.StringUtil;
+import net.minecraft.util.Unit;
 import net.neoforged.api.distmarker.Dist;
+import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.RegisterGuiLayersEvent;
-import net.neoforged.neoforge.client.gui.IIngameOverlay;
+import net.neoforged.neoforge.client.event.RenderGuiLayerEvent;
+
+import java.util.Locale;
 
 @EventBusSubscriber(modid = tpshudneoforge.MODID, value = Dist.CLIENT, bus = EventBusSubscriber.Bus.MOD)
 public final class TpsOverlay {
 
+    private static final ResourceLocation LAYER_ID =
+            new ResourceLocation(tpshudneoforge.MODID, "tps_hud");
+
     private TpsOverlay() {}
 
-    /** Register a dedicated GUI layer so ordering is stable and compatible with Sodium/RSO. */
-    @EventBusSubscriber(modid = tpshudneoforge.MODID, value = Dist.CLIENT, bus = EventBusSubscriber.Bus.MOD)
-    public static final class Layers {
-        @net.neoforged.bus.api.SubscribeEvent
-        public static void register(RegisterGuiLayersEvent e) {
-            e.registerAboveAll("tpshudneoforge:tps_hud", new IIngameOverlay() {
-                @Override
-                public void render(GuiGraphics gfx, float partialTick) {
-                    TpsOverlay.render(gfx);
-                }
-            });
+    @SubscribeEvent
+    public static void onRegisterLayers(RegisterGuiLayersEvent event) {
+        event.registerAboveAll(LAYER_ID, (GuiGraphics gfx, net.minecraft.util.DeltaTracker delta) -> {
+            render(gfx);
+            return Unit.INSTANCE;
+        });
+    }
+
+    @EventBusSubscriber(modid = tpshudneoforge.MODID, value = Dist.CLIENT, bus = EventBusSubscriber.Bus.GAME)
+    public static final class FallbackRender {
+        @SubscribeEvent
+        public static void onRenderGui(RenderGuiLayerEvent.Post e) {
+            render(e.getGuiGraphics());
         }
     }
 
     public static void render(GuiGraphics gfx) {
         Minecraft mc = Minecraft.getInstance();
-        if (mc == null || mc.level == null) return;
+        if (mc == null || mc.level == null || mc.player == null) return;
 
         TpsHudConfig cfg = ConfigManager.get();
         if (!cfg.enabled) return;
-        if (cfg.autoHideF3 && mc.options.renderDebug) return;
-
-        Font font = mc.font;
 
         float tps = TpsTracker.getTps();
         float mspt = TpsTracker.getMspt();
         if (Float.isNaN(tps)) return;
 
-        // Compose strings according to format & precision
-        int prec = Math.max(0, Math.min(3, cfg.precision));
-        String tpsStr = String.format(java.util.Locale.ROOT, "%." + prec + "f", tps);
-        String msptStr = String.format(java.util.Locale.ROOT, "%." + prec + "f", mspt);
+        int prec = Mth.clamp(cfg.precision, 0, 3);
+        String tpsStr = String.format(Locale.ROOT, "%." + prec + "f", tps);
+        String msptStr = String.format(Locale.ROOT, "%." + prec + "f", mspt);
 
-        String label1 = "TPS";
-        String label2 = "MSPT";
+        String line1;
+        String line2 = null;
 
-        // Colors by thresholds
+        // Colors by threshold
         int tpsColor = pickTpsColor(cfg, tps);
         int msptColor = pickMsptColor(cfg, mspt);
 
-        String line1, line2 = null;
-        int valueColor1, valueColor2 = cfg.valueTextColor;
-
         switch (cfg.format) {
-            case TPS -> {
-                line1 = label1 + ": " + tpsStr;
-                valueColor1 = tpsColor;
-            }
-            case MSPT -> {
-                line1 = label2 + ": " + msptStr;
-                valueColor1 = msptColor;
-            }
-            default -> { // BOTH
+            case TPS -> line1 = "TPS: " + tpsStr;
+            case MSPT -> line1 = "MSPT: " + msptStr;
+            default -> {
                 if (cfg.displayMode == TpsHudConfig.Mode.COMPACT) {
-                    line1 = label1 + " " + tpsStr + " | " + label2 + " " + msptStr;
-                    valueColor1 = cfg.valueTextColor; // mix; draw single line with default value color
+                    line1 = "TPS " + tpsStr + " | MSPT " + msptStr;
                 } else {
-                    line1 = label1 + ": " + tpsStr;
-                    line2 = label2 + ": " + msptStr;
-                    valueColor1 = tpsColor;
-                    valueColor2 = msptColor;
+                    line1 = "TPS: " + tpsStr;
+                    line2 = "MSPT: " + msptStr;
                 }
             }
         }
 
-        // Layout
-        int pad = Math.max(0, cfg.padding);
-        int x = pad, y = pad;
+        Font font = mc.font;
+        int sw = gfx.guiWidth();
+        int sh = gfx.guiHeight();
 
-        // Measure
+        // Measure text
         int w = font.width(line1);
         int h = font.lineHeight;
-        if (line2 != null) {
+        if (!StringUtil.isNullOrEmpty(line2)) {
             w = Math.max(w, font.width(line2));
             h = h * 2 + 2;
         }
 
-        // Anchor position
-        int screenW = gfx.guiWidth();
-        int screenH = gfx.guiHeight();
+        int pad = Math.max(0, cfg.padding);
+        int x = pad, y = pad;
         switch (cfg.anchor) {
-            case TOP_RIGHT -> { x = screenW - pad - w; y = pad; }
-            case BOTTOM_LEFT -> { x = pad; y = screenH - pad - h; }
-            case BOTTOM_RIGHT -> { x = screenW - pad - w; y = screenH - pad - h; }
-            default -> { x = pad; y = pad; }
+            case TOP_RIGHT -> { x = sw - pad - w; y = pad; }
+            case BOTTOM_LEFT -> { x = pad; y = sh - pad - h; }
+            case BOTTOM_RIGHT -> { x = sw - pad - w; y = sh - pad - h; }
+            case TOP_LEFT -> { /* default */ }
         }
 
-        // Draw
+        float scale = Mth.clamp(cfg.scale, 0.5f, 2.0f);
+
         gfx.pose().pushPose();
-        float s = Math.max(0.5f, Math.min(2.0f, cfg.scale));
         gfx.pose().translate(x, y, 0);
-        gfx.pose().scale(s, s, 1);
+        gfx.pose().scale(scale, scale, 1.0f);
 
         int bgPad = 3;
         int bgW = w + bgPad * 2;
@@ -118,41 +113,35 @@ public final class TpsOverlay {
             gfx.fill(-bgPad, -bgPad, -bgPad + bgW, -bgPad + bgH, 0x66000000);
         }
 
-        if (cfg.shadow) {
-            gfx.drawString(font, line1, 0, 0, cfg.textColor, true);
-            if (cfg.format == TpsHudConfig.Format.TPS) {
-                int labelW = font.width("TPS: ");
-                gfx.drawString(font, tpsStr, labelW, 0, tpsColor, true);
-            } else if (cfg.format == TpsHudConfig.Format.MSPT) {
-                int labelW = font.width("MSPT: ");
-                gfx.drawString(font, msptStr, labelW, 0, msptColor, true);
-            }
-            if (line2 != null) {
-                gfx.drawString(font, line2, 0, font.lineHeight + 2, cfg.textColor, true);
-                int labelW2 = font.width("MSPT: ");
-                gfx.drawString(font, msptStr, labelW2, font.lineHeight + 2, msptColor, true);
-            }
+        // Draw first line (with value recolor for non-compact layouts)
+        if (cfg.format == TpsHudConfig.Format.TPS) {
+            gfx.drawString(font, "TPS: ", 0, 0, cfg.textColor, cfg.shadow);
+            int labelW = font.width("TPS: ");
+            gfx.drawString(font, tpsStr, labelW, 0, tpsColor, cfg.shadow);
+        } else if (cfg.format == TpsHudConfig.Format.MSPT) {
+            gfx.drawString(font, "MSPT: ", 0, 0, cfg.textColor, cfg.shadow);
+            int labelW = font.width("MSPT: ");
+            gfx.drawString(font, msptStr, labelW, 0, msptColor, cfg.shadow);
+        } else if (cfg.displayMode == TpsHudConfig.Mode.COMPACT) {
+            gfx.drawString(font, line1, 0, 0, cfg.textColor, cfg.shadow);
         } else {
-            gfx.drawString(font, line1, 0, 0, cfg.textColor, false);
-            if (cfg.format == TpsHudConfig.Format.TPS) {
-                int labelW = font.width("TPS: ");
-                gfx.drawString(font, tpsStr, labelW, 0, tpsColor, false);
-            } else if (cfg.format == TpsHudConfig.Format.MSPT) {
-                int labelW = font.width("MSPT: ");
-                gfx.drawString(font, msptStr, labelW, 0, msptColor, false);
-            }
-            if (line2 != null) {
-                gfx.drawString(font, line2, 0, font.lineHeight + 2, cfg.textColor, false);
-                int labelW2 = font.width("MSPT: ");
-                gfx.drawString(font, msptStr, labelW2, font.lineHeight + 2, msptColor, false);
-            }
+            gfx.drawString(font, "TPS: ", 0, 0, cfg.textColor, cfg.shadow);
+            int labelW = font.width("TPS: ");
+            gfx.drawString(font, tpsStr, labelW, 0, tpsColor, cfg.shadow);
+        }
+
+        // Second line for BOTH + DETAIL
+        if (line2 != null) {
+            int y2 = font.lineHeight + 2;
+            gfx.drawString(font, "MSPT: ", 0, y2, cfg.textColor, cfg.shadow);
+            int lbl = font.width("MSPT: ");
+            gfx.drawString(font, msptStr, lbl, y2, msptColor, cfg.shadow);
         }
 
         gfx.pose().popPose();
     }
 
     private static int pickTpsColor(TpsHudConfig cfg, float tps) {
-        if (Float.isNaN(tps)) return cfg.valueTextColor;
         TpsHudConfig.Thresholds th = cfg.thresholds;
         if (tps <= th.tpsBad) return parseHex(th.tpsBadColor, cfg.valueTextColor);
         if (tps <= th.tpsWarn) return parseHex(th.tpsWarnColor, cfg.valueTextColor);
@@ -160,7 +149,6 @@ public final class TpsOverlay {
     }
 
     private static int pickMsptColor(TpsHudConfig cfg, float mspt) {
-        if (Float.isNaN(mspt)) return cfg.valueTextColor;
         TpsHudConfig.Thresholds th = cfg.thresholds;
         if (mspt >= th.msptBad) return parseHex(th.msptBadColor, cfg.valueTextColor);
         if (mspt >= th.msptWarn) return parseHex(th.msptWarnColor, cfg.valueTextColor);
