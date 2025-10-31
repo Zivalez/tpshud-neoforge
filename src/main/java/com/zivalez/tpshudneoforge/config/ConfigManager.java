@@ -17,27 +17,30 @@ public final class ConfigManager {
 
     public static synchronized TpsHudConfig get() {
         if (INSTANCE == null) {
-            INSTANCE = load();
+            INSTANCE = loadOrCreate();
         }
         return INSTANCE;
     }
 
     public static synchronized void save() {
         try {
-            File cfgDir = FMLPaths.CONFIGDIR.get().toFile();
-            File file = new File(cfgDir, FILE_NAME);
+            File file = FMLPaths.CONFIGDIR.get().resolve(FILE_NAME).toFile();
+            file.getParentFile().mkdirs();
             try (FileWriter fw = new FileWriter(file)) {
-                GSON.toJson(INSTANCE == null ? new TpsHudConfig() : INSTANCE, fw);
+                GSON.toJson(INSTANCE != null ? INSTANCE : new TpsHudConfig(), fw);
             }
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
-    private static TpsHudConfig load() {
+    public static synchronized void reload() {
+        INSTANCE = loadOrCreate();
+    }
+
+    private static TpsHudConfig loadOrCreate() {
         try {
-            File cfgDir = FMLPaths.CONFIGDIR.get().toFile();
-            File file = new File(cfgDir, FILE_NAME);
+            File file = FMLPaths.CONFIGDIR.get().resolve(FILE_NAME).toFile();
             if (!file.exists()) {
                 TpsHudConfig def = new TpsHudConfig();
                 try (FileWriter fw = new FileWriter(file)) {
@@ -47,7 +50,8 @@ public final class ConfigManager {
             }
             try (FileReader fr = new FileReader(file)) {
                 TpsHudConfig cfg = GSON.fromJson(fr, TpsHudConfig.class);
-                return cfg != null ? cfg : new TpsHudConfig();
+                if (cfg == null) cfg = new TpsHudConfig();
+                return cfg;
             }
         } catch (Exception e) {
             e.printStackTrace();

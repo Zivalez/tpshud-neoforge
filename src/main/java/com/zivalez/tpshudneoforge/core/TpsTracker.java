@@ -1,5 +1,7 @@
 package com.zivalez.tpshudneoforge.core;
 
+import com.zivalez.tpshudneoforge.config.ConfigManager;
+import com.zivalez.tpshudneoforge.config.TpsHudConfig;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 
@@ -7,8 +9,8 @@ import java.util.ArrayDeque;
 import java.util.Deque;
 
 public final class TpsTracker {
-    private static final int WINDOW = 40;
-    private static final Deque<Double> samples = new ArrayDeque<>(WINDOW);
+    private static int windowSize = 40;
+    private static Deque<Double> samples = new ArrayDeque<>(windowSize);
 
     private static long lastGameTime = Long.MIN_VALUE;
     private static long lastWallNanos = 0L;
@@ -17,44 +19,59 @@ public final class TpsTracker {
 
     private TpsTracker() {}
 
+    /** Called from ClientPacketListener mixin when world time packet arrives */
     public static void onWorldTimePacket() {
-        sampleNow();
+        sampleNow(true);
     }
 
+    /** Fallback sampling from client tick (when singleplayer or no time packet yet) */
     public static void onClientTickFallback() {
-        sampleNow();
+        sampleNow(false);
     }
 
-    private static void sampleNow() {
+    private static void sampleNow(boolean fromPacket) {
         Minecraft mc = Minecraft.getInstance();
+        if (mc == null) return;
         ClientLevel level = mc.level;
         if (level == null) return;
 
-        long gt = level.getGameTime();
-        long now = System.nanoTime();
-
-        if (lastGameTime != Long.MIN_VALUE) {
-            long dtTicks = gt - lastGameTime;
-            long dtNanos = now - lastWallNanos;
-
-            if (dtTicks > 0 && dtNanos > 0) {
-                double tps = (dtTicks * 1_000_000_000d) / dtNanos;
-                if (tps > 20.0) tps = 20.0;
-                pushSample(tps);
-            }
+        // Apply dynamic window size from config
+        TpsHudConfig cfg = ConfigManager.get();
+        int desired = Math.max(5, Math.min(240, cfg.smoothingWindow));
+        if (desired != windowSize) {
+            windowSize = desired;
+            samples = new ArrayDeque<>(windowSize);
         }
 
-        lastGameTime = gt;
-        lastWallNanos = now;
-    }
+        long gameTime = level.getGameTime();
+        long nanos = System.nanoTime();
 
-    private static void pushSample(double tps) {
-        if (samples.size() == WINDOW) samples.removeFirst();
+        if (lastGameTime == Long.MIN_VALUE) {
+            lastGameTime = gameTime;
+            lastWallNanos = nanos;
+            return;
+        }
+
+        long dtTicks = gameTime - lastGameTime;
+        long dtNanos = nanos - lastWallNanos;
+        if (dtTicks <= 0 || dtNanos <= 0) {
+            return;
+        }
+
+        // Estimate TPS = ticks / seconds
+        double seconds = dtNanos / 1_000_000_000.0;
+        double tps = dtTicks / seconds;
+
+        if (samples.size() == windowSize) samples.removeFirst();
         samples.addLast(tps);
 
+        // Compute moving average
         double sum = 0.0;
         for (double v : samples) sum += v;
         cachedTps = sum / samples.size();
+
+        lastGameTime = gameTime;
+        lastWallNanos = nanos;
     }
 
     public static float getTps() {
@@ -65,10 +82,5 @@ public final class TpsTracker {
         if (Double.isNaN(cachedTps)) return Float.NaN;
         if (cachedTps <= 0.0) return Float.POSITIVE_INFINITY;
         return (float) (1000.0 / cachedTps);
-    }
-
-    public static String getFormatted() {
-        if (Double.isNaN(cachedTps)) return "--";
-        return String.format("%.2f", cachedTps);
     }
 }

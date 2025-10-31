@@ -2,12 +2,14 @@
   "itemGroup.tpshudneoforge": "Example Mod Tab",
   "block.tpshudneoforge.example_block": "Example Block",
   "item.tpshudneoforge.example_item": "Example Item",
-
   "tpshudneoforge.configuration.title": "tpshud-neoforge Configs",
   "tpshudneoforge.configuration.section.tpshudneoforge.common.toml": "tpshud-neoforge Configs",
   "tpshudneoforge.configuration.section.tpshudneoforge.common.toml.title": "tpshud-neoforge Configs",
   "tpshudneoforge.configuration.items": "Item List",
   "tpshudneoforge.configuration.logDirtBlock": "Log Dirt Block",
   "tpshudneoforge.configuration.magicNumberIntroduction": "Magic Number Text",
-  "tpshudneoforge.configuration.magicNumber": "Magic Number"
+  "tpshudneoforge.configuration.magicNumber": "Magic Number",
+  "key.categories.tpshud": "TPS HUD",
+  "key.tpshud.toggle": "Toggle HUD",
+  "key.tpshud.reload": "Reload Config"
 }
