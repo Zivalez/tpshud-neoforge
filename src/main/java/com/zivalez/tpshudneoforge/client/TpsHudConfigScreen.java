@@ -1,5 +1,6 @@
 package com.zivalez.tpshudneoforge.client;
 
+import com.zivalez.tpshudneoforge.client.hud.TpsOverlay;
 import com.zivalez.tpshudneoforge.config.ConfigManager;
 import com.zivalez.tpshudneoforge.config.TpsHudConfig;
 import com.zivalez.tpshudneoforge.config.TpsHudConfig.Anchor;
@@ -21,8 +22,9 @@ public class TpsHudConfigScreen extends Screen {
 
     private final Screen parent;
     private ModelView mv;
+    private boolean preview = false;
 
-    // ---- Layout constants (single source of truth) ----
+    // ---- Layout constants ----
     private int TITLE_Y;
     private int COL_LEFT_X;
     private int LABEL_W;
@@ -33,7 +35,6 @@ public class TpsHudConfigScreen extends Screen {
     private static final int GAP_Y = 6;
 
     private final List<Label> labels = new ArrayList<>();
-
     private final List<Tip> tips = new ArrayList<>();
 
     public TpsHudConfigScreen(Screen parent) {
@@ -48,12 +49,12 @@ public class TpsHudConfigScreen extends Screen {
 
         TITLE_Y = 12;
 
-        int formW = Math.min(usableW, 380); // keep it compact and neat
-        COL_LEFT_X = (this.width - formW) / 2; // center the whole form block
-        LABEL_W = 128;                         // fixed label width
-        CTRL_X = COL_LEFT_X + LABEL_W + 12;    // gap between label and control
+        int formW = Math.min(usableW, 380);
+        COL_LEFT_X = (this.width - formW) / 2;
+        LABEL_W = 128;
+        CTRL_X = COL_LEFT_X + LABEL_W + 12;
         CTRL_W = formW - (LABEL_W + 12);
-        CUR_Y  = TITLE_Y + 24 + 10;            // below title
+        CUR_Y  = TITLE_Y + 24 + 10;
     }
 
     private void addLabel(String text) {
@@ -81,6 +82,17 @@ public class TpsHudConfigScreen extends Screen {
         return Math.max(min, Math.min(max, v));
     }
 
+    private TpsHudConfig toConfigFromMV() {
+        TpsHudConfig c = new TpsHudConfig();
+        mv.applyTo(c);
+        return c;
+    }
+
+    private void togglePreview() {
+        this.preview = !this.preview;
+        this.init();
+    }
+
     // ---------- Screen lifecycle ----------
     @Override
     protected void init() {
@@ -91,10 +103,23 @@ public class TpsHudConfigScreen extends Screen {
         if (this.mv == null) this.mv = new ModelView(ConfigManager.get());
         layoutReset();
 
-        // ===== Title (centered) =====
-        // (Drawn in render())
+        // ===== Title (centered) ===== (drawn in render())
 
-        // ===== Enabled =====
+        if (preview) {
+            // -------- PREVIEW MODE --------
+            int cx = this.width / 2;
+
+            var exit = Button.builder(Component.literal("Exit Preview"), b -> togglePreview())
+                    .bounds(cx - 60, this.height - 28, 120, 20)
+                    .build();
+            addRenderableWidget(exit);
+
+            return;
+        }
+
+        // -------- NORMAL MODE (form) --------
+
+        // Enabled
         addLabel("Enabled");
         var enabledBtn = CycleButton.booleanBuilder(Component.literal("ON"), Component.literal("OFF"))
                 .displayOnlyValue()
@@ -105,7 +130,7 @@ public class TpsHudConfigScreen extends Screen {
         addTip(enabledBtn, "Show or hide the TPS HUD overlay.");
         nextRow();
 
-        // ===== Anchor =====
+        // Anchor
         addLabel("Anchor");
         var anchorBtn = CycleButton.<Anchor>builder(a -> Component.literal(a.name().replace('_', '-')))
                 .withValues(Anchor.values())
@@ -117,7 +142,7 @@ public class TpsHudConfigScreen extends Screen {
         addTip(anchorBtn, "Choose which screen corner the HUD attaches to.");
         nextRow();
 
-        // ===== Padding =====
+        // Padding
         addLabel("Padding (px)");
         var padBox = new EditBox(this.font, CTRL_X, CUR_Y, CTRL_W, 20, Component.empty());
         padBox.setValue(String.valueOf(mv.padding));
@@ -129,6 +154,7 @@ public class TpsHudConfigScreen extends Screen {
         addTip(padBox, "Margin from the screen edges, in pixels.");
         nextRow();
 
+        // Scale (%)
         addLabel("Scale (%)");
         final int btnW = 22;
 
@@ -171,7 +197,7 @@ public class TpsHudConfigScreen extends Screen {
         addTip(scaleInc, "Increase HUD size.");
         nextRow();
 
-        // ===== Precision =====
+        // Precision
         addLabel("Precision (decimals)");
         var precisionBtn = CycleButton.<Integer>builder(v -> Component.literal(String.valueOf(v)))
                 .withValues(0, 1, 2, 3)
@@ -183,7 +209,7 @@ public class TpsHudConfigScreen extends Screen {
         addTip(precisionBtn, "Number of decimal places for TPS/MSPT values.");
         nextRow();
 
-        // ===== Format =====
+        // Format
         addLabel("Format");
         var formatBtn = CycleButton.<Format>builder(v -> Component.literal(v.name()))
                 .withValues(Format.values())
@@ -195,7 +221,7 @@ public class TpsHudConfigScreen extends Screen {
         addTip(formatBtn, "Show TPS only, MSPT only, or BOTH (two lines).");
         nextRow();
 
-        // ===== Smoothing =====
+        // Smoothing
         addLabel("Smoothing Window (samples)");
         var smoothBox = new EditBox(this.font, CTRL_X, CUR_Y, CTRL_W, 20, Component.empty());
         smoothBox.setValue(String.valueOf(mv.smoothingWindow));
@@ -207,7 +233,7 @@ public class TpsHudConfigScreen extends Screen {
         addTip(smoothBox, "Moving average window size. Larger = smoother but slower to react.");
         nextRow();
 
-        // ===== Auto-hide F3 =====
+        // Auto-hide F3
         addLabel("Auto-hide when F3 open");
         var autoHideBtn = CycleButton.booleanBuilder(Component.literal("ON"), Component.literal("OFF"))
                 .displayOnlyValue()
@@ -218,11 +244,11 @@ public class TpsHudConfigScreen extends Screen {
         addTip(autoHideBtn, "Hide overlay while the debug screen (F3) is open.");
         nextRow();
 
-        // ==== Divider ====
+        // Divider
         CUR_Y += 2;
         nextRow();
 
-        // ===== TPS thresholds =====
+        // TPS thresholds
         addLabel("TPS Thresholds");
         CUR_Y += 14;
 
@@ -251,7 +277,7 @@ public class TpsHudConfigScreen extends Screen {
         addTip(tpsBadC,  "TPS bad color (#RRGGBB).");
         nextRow();
 
-        // ===== MSPT thresholds =====
+        // MSPT thresholds
         addLabel("MSPT Thresholds");
         CUR_Y += 14;
 
@@ -279,39 +305,66 @@ public class TpsHudConfigScreen extends Screen {
         addTip(msptBadC,  "MSPT bad color (#RRGGBB).");
         nextRow();
 
-        // ===== Buttons (Done / Reset / Cancel) =====
+        // Footer buttons: Done / Apply / Reset / Cancel / Preview
         int cx = this.width / 2;
+
         var done = Button.builder(Component.literal("Done"), b -> {
                     mv.applyTo(ConfigManager.get());
                     ConfigManager.save();
                     onClose();
                 })
-                .bounds(cx - 155, this.height - 28, 100, 20)
+                .bounds(cx - 205, this.height - 28, 90, 20)
+                .build();
+
+        var apply = Button.builder(Component.literal("Apply"), b -> {
+                    mv.applyTo(ConfigManager.get());
+                    ConfigManager.save();
+                })
+                .bounds(cx - 105, this.height - 28, 90, 20)
                 .build();
 
         var reset = Button.builder(Component.literal("Reset"), b -> {
                     this.mv = new ModelView(new TpsHudConfig());
-                    this.init();
+                    this.init(); // full rebuild, avoids overlap
                 })
-                .bounds(cx - 50, this.height - 28, 100, 20)
+                .bounds(cx - 5, this.height - 28, 90, 20)
                 .build();
 
         var cancel = Button.builder(Component.literal("Cancel"), b -> onClose())
-                .bounds(cx + 55, this.height - 28, 100, 20)
+                .bounds(cx + 95, this.height - 28, 90, 20)
+                .build();
+
+        var previewBtn = Button.builder(Component.literal("Preview"), b -> togglePreview())
+                .bounds(cx + 195, this.height - 28, 90, 20)
                 .build();
 
         addRenderableWidget(done);
+        addRenderableWidget(apply);
         addRenderableWidget(reset);
         addRenderableWidget(cancel);
+        addRenderableWidget(previewBtn);
     }
 
     @Override
     public void render(GuiGraphics gfx, int mouseX, int mouseY, float delta) {
         super.render(gfx, mouseX, mouseY, delta);
 
-        String title = "TPS HUD – Settings";
+        // Title
+        String title = preview ? "TPS HUD – Preview" : "TPS HUD – Settings";
         int titleW = this.font.width(title);
         gfx.drawString(this.font, title, (this.width - titleW) / 2, TITLE_Y, 0xFFFFFF, false);
+
+        if (preview) {
+            gfx.fill(0, 0, this.width, this.height, 0x66000000);
+
+            TpsHudConfig cfg = toConfigFromMV();
+
+            float sampleTps = 20.0f;
+            float sampleMspt = 50.0f;
+
+            TpsOverlay.renderPreview(gfx, cfg, sampleTps, sampleMspt, this.width, this.height);
+            return;
+        }
 
         for (var l : labels) {
             gfx.drawString(this.font, l.text(), l.x(), l.y(), 0xE0E0E0, false);
@@ -332,7 +385,6 @@ public class TpsHudConfigScreen extends Screen {
 
     // ---------- Small utilities ----------
     private record Label(int x, int y, Component text) {}
-
     private record Tip(AbstractWidget widget, Component text) {}
 
     private static void validateDoubleBox(EditBox box, String s, java.util.function.DoubleConsumer onValid) {
