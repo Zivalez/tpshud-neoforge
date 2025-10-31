@@ -5,11 +5,10 @@ import com.zivalez.tpshudneoforge.config.TpsHudConfig;
 import com.zivalez.tpshudneoforge.config.TpsHudConfig.Anchor;
 import com.zivalez.tpshudneoforge.config.TpsHudConfig.Format;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.CycleButton;
 import net.minecraft.client.gui.components.EditBox;
-import net.minecraft.client.gui.components.AbstractWidget;
-import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
@@ -18,80 +17,128 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
+
 public class TpsHudConfigScreen extends Screen {
 
     private final Screen parent;
-    private final List<AbstractWidget> widgets = new ArrayList<>();
-    private final List<Label> labels = new ArrayList<>();
     private ModelView mv;
+
+    // ---- Layout constants (single source of truth) ----
+    private int TITLE_Y;
+    private int COL_LEFT_X;
+    private int LABEL_W;
+    private int CTRL_X;
+    private int CTRL_W;
+    private int CUR_Y;
+    private static final int ROW_H = 22;
+    private static final int GAP_Y = 6;
+
+    private final List<Label> labels = new ArrayList<>();
+
+    private final List<Tip> tips = new ArrayList<>();
 
     public TpsHudConfigScreen(Screen parent) {
         super(Component.literal("TPS HUD Config"));
         this.parent = parent;
     }
 
+    // ---------- Helpers ----------
+    private void layoutReset() {
+        int pad = 16;
+        int usableW = Math.max(320, this.width - pad * 2);
+
+        // Title center
+        TITLE_Y = 12;
+
+        int formW = Math.min(usableW, 380);
+        COL_LEFT_X = (this.width - formW) / 2;
+        LABEL_W = 128;
+        CTRL_X = COL_LEFT_X + LABEL_W + 12;
+        CTRL_W = formW - (LABEL_W + 12);
+        CUR_Y  = TITLE_Y + 24 + 10;
+    }
+
+    private void addLabel(String text) {
+        labels.add(new Label(COL_LEFT_X, CUR_Y + 5, Component.literal(text)));
+    }
+
+    private void nextRow() {
+        CUR_Y += ROW_H + GAP_Y;
+    }
+
+    private void addTip(AbstractWidget w, String text) {
+        tips.add(new Tip(w, Component.literal(text)));
+    }
+
+    private static String trimDouble(double v) {
+        if (Math.abs(v - Math.round(v)) < 1e-6) return String.valueOf((long) Math.round(v));
+        return String.valueOf(v);
+    }
+
+    private static int clampInt(int v, int min, int max) {
+        return Math.max(min, Math.min(max, v));
+    }
+
+    private static double clamp(double v, double min, double max) {
+        return Math.max(min, Math.min(max, v));
+    }
+
+    // ---------- Screen lifecycle ----------
     @Override
     protected void init() {
-        widgets.clear();
-        labels.clear();
+        this.clearWidgets();
+        this.labels.clear();
+        this.tips.clear();
 
-        if (this.mv == null) {
-            this.mv = new ModelView(ConfigManager.get());
-        }
+        if (this.mv == null) this.mv = new ModelView(ConfigManager.get());
+        layoutReset();
 
-        int left = this.width / 2 - 160;
-        int y = 28;
-        int w = 320;
-        int gap = 6;
-
-        // ===== Title
-        labels.add(new Label(left, y, Component.literal("TPS HUD – Settings")));
-        y += 14 + gap;
-
-        // ===== Enabled
-        labels.add(new Label(left, y + 5, Component.literal("Enabled")));
+        // ===== Enabled =====
+        addLabel("Enabled");
         var enabledBtn = CycleButton.booleanBuilder(Component.literal("ON"), Component.literal("OFF"))
                 .displayOnlyValue()
-                .create(left + 140, y, w - 140, 20, Component.empty(),
-                        (btn, value) -> mv.enabled = value);
+                .create(CTRL_X, CUR_Y, CTRL_W, 20, Component.empty(),
+                        (btn, v) -> mv.enabled = v);
         enabledBtn.setValue(mv.enabled);
-        enabledBtn.setTooltip(Tooltip.create(Component.literal("Show or hide the TPS HUD overlay.")));
-        widgets.add(enabledBtn);
-        y += 22 + gap;
+        addRenderableWidget(enabledBtn);
+        addTip(enabledBtn, "Show or hide the TPS HUD overlay.");
+        nextRow();
 
-        // ===== Anchor
-        labels.add(new Label(left, y + 5, Component.literal("Anchor")));
+        // ===== Anchor =====
+        addLabel("Anchor");
         var anchorBtn = CycleButton.<Anchor>builder(a -> Component.literal(a.name().replace('_', '-')))
                 .withValues(Anchor.values())
                 .displayOnlyValue()
-                .create(left + 140, y, w - 140, 20, Component.empty(),
-                        (btn, value) -> mv.anchor = value);
+                .create(CTRL_X, CUR_Y, CTRL_W, 20, Component.empty(),
+                        (btn, v) -> mv.anchor = v);
         anchorBtn.setValue(mv.anchor);
-        anchorBtn.setTooltip(Tooltip.create(Component.literal("Choose which screen corner the HUD attaches to.")));
-        widgets.add(anchorBtn);
-        y += 22 + gap;
+        addRenderableWidget(anchorBtn);
+        addTip(anchorBtn, "Choose which screen corner the HUD attaches to.");
+        nextRow();
 
-        // ===== Padding
-        labels.add(new Label(left, y + 5, Component.literal("Padding (px)")));
-        var padBox = new EditBox(this.font, left + 140, y, w - 140, 20, Component.empty());
+        // ===== Padding =====
+        addLabel("Padding (px)");
+        var padBox = new EditBox(this.font, CTRL_X, CUR_Y, CTRL_W, 20, Component.empty());
         padBox.setValue(String.valueOf(mv.padding));
         padBox.setResponder(s -> {
             try { mv.padding = clampInt(Integer.parseInt(s.trim()), 0, 64); padBox.setTextColor(0xE0E0E0); }
             catch (Exception ex) { padBox.setTextColor(0xFF5555); }
         });
-        padBox.setTooltip(Tooltip.create(Component.literal("Margin from the screen edges, in pixels.")));
-        widgets.add(padBox);
-        y += 22 + gap;
+        addRenderableWidget(padBox);
+        addTip(padBox, "Margin from the screen edges, in pixels.");
+        nextRow();
 
-        // ===== Scale (%)
-        labels.add(new Label(left, y + 5, Component.literal("Scale (%)")));
+        // ===== Scale (%) with +/- and box in one row =====
+        addLabel("Scale (%)");
+        int btnW = 22;
         var scaleDec = Button.builder(Component.literal("-"), b -> {
                     mv.scale = Mth.clamp(mv.scale - 0.05f, 0.5f, 2.0f);
+                    // reflect in box
+                    scaleBox.setValue(String.valueOf(Math.round(mv.scale * 100)));
                 })
-                .bounds(left + 140, y, 20, 20)
+                .bounds(CTRL_X, CUR_Y, btnW, 20)
                 .build();
-
-        var scaleBox = new EditBox(this.font, left + 162, y, w - 140 - 44, 20, Component.empty());
+        var scaleBox = new EditBox(this.font, CTRL_X + btnW + 4, CUR_Y, CTRL_W - (btnW + 4) * 2, 20, Component.empty());
         scaleBox.setValue(String.valueOf(Math.round(mv.scale * 100)));
         scaleBox.setResponder(s -> {
             try {
@@ -102,144 +149,130 @@ public class TpsHudConfigScreen extends Screen {
                 scaleBox.setTextColor(0xFF5555);
             }
         });
-        scaleBox.setTooltip(Tooltip.create(Component.literal("HUD size multiplier in percent (50%–200%).")));
-
         var scaleInc = Button.builder(Component.literal("+"), b -> {
                     mv.scale = Mth.clamp(mv.scale + 0.05f, 0.5f, 2.0f);
+                    scaleBox.setValue(String.valueOf(Math.round(mv.scale * 100)));
                 })
-                .bounds(left + w - 22, y, 22, 20)
+                .bounds(CTRL_X + CTRL_W - btnW, CUR_Y, btnW, 20)
                 .build();
+        addRenderableWidget(scaleDec);
+        addRenderableWidget(scaleBox);
+        addRenderableWidget(scaleInc);
+        addTip(scaleDec, "Decrease HUD size.");
+        addTip(scaleBox, "HUD size multiplier in percent (50%–200%).");
+        addTip(scaleInc, "Increase HUD size.");
+        nextRow();
 
-        widgets.add(scaleDec);
-        widgets.add(scaleBox);
-        widgets.add(scaleInc);
-        y += 22 + gap;
-
-        // ===== Precision
-        labels.add(new Label(left, y + 5, Component.literal("Precision (decimals)")));
+        // ===== Precision =====
+        addLabel("Precision (decimals)");
         var precisionBtn = CycleButton.<Integer>builder(v -> Component.literal(String.valueOf(v)))
                 .withValues(0, 1, 2, 3)
                 .displayOnlyValue()
-                .create(left + 140, y, w - 140, 20, Component.empty(),
-                        (btn, value) -> mv.precision = value);
+                .create(CTRL_X, CUR_Y, CTRL_W, 20, Component.empty(),
+                        (btn, v) -> mv.precision = v);
         precisionBtn.setValue(mv.precision);
-        precisionBtn.setTooltip(Tooltip.create(Component.literal("Number of decimal places for TPS/MSPT values.")));
-        widgets.add(precisionBtn);
-        y += 22 + gap;
+        addRenderableWidget(precisionBtn);
+        addTip(precisionBtn, "Number of decimal places for TPS/MSPT values.");
+        nextRow();
 
-        // ===== Format
-        labels.add(new Label(left, y + 5, Component.literal("Format")));
+        // ===== Format =====
+        addLabel("Format");
         var formatBtn = CycleButton.<Format>builder(v -> Component.literal(v.name()))
                 .withValues(Format.values())
                 .displayOnlyValue()
-                .create(left + 140, y, w - 140, 20, Component.empty(),
-                        (btn, value) -> mv.format = value);
+                .create(CTRL_X, CUR_Y, CTRL_W, 20, Component.empty(),
+                        (btn, v) -> mv.format = v);
         formatBtn.setValue(mv.format);
-        formatBtn.setTooltip(Tooltip.create(Component.literal("""
-        Show TPS only, MSPT only, or BOTH:
-        • TPS: ticks per second (target 20).
-        • MSPT: ms per tick (lower is better, target 50 ms).
-        • BOTH: show both on separate lines.
-        """)));
-        widgets.add(formatBtn);
-        y += 22 + gap;
+        addRenderableWidget(formatBtn);
+        addTip(formatBtn, "Show TPS only, MSPT only, or BOTH (two lines).");
+        nextRow();
 
-        // ===== Smoothing Window
-        labels.add(new Label(left, y + 5, Component.literal("Smoothing Window (samples)")));
-        var smoothBox = new EditBox(this.font, left + 140, y, w - 140, 20, Component.empty());
+        // ===== Smoothing =====
+        addLabel("Smoothing Window (samples)");
+        var smoothBox = new EditBox(this.font, CTRL_X, CUR_Y, CTRL_W, 20, Component.empty());
         smoothBox.setValue(String.valueOf(mv.smoothingWindow));
         smoothBox.setResponder(s -> {
             try { mv.smoothingWindow = clampInt(Integer.parseInt(s.trim()), 5, 240); smoothBox.setTextColor(0xE0E0E0); }
             catch (Exception ex) { smoothBox.setTextColor(0xFF5555); }
         });
-        smoothBox.setTooltip(Tooltip.create(Component.literal("Moving average window size.\nLarger = smoother but slower to react.")));
-        widgets.add(smoothBox);
-        y += 22 + gap;
+        addRenderableWidget(smoothBox);
+        addTip(smoothBox, "Moving average window size. Larger = smoother but slower to react.");
+        nextRow();
 
-        // ===== Auto-hide F3
-        labels.add(new Label(left, y + 5, Component.literal("Auto-hide when F3 open")));
+        // ===== Auto-hide F3 =====
+        addLabel("Auto-hide when F3 open");
         var autoHideBtn = CycleButton.booleanBuilder(Component.literal("ON"), Component.literal("OFF"))
                 .displayOnlyValue()
-                .create(left + 140, y, w - 140, 20, Component.empty(),
-                        (btn, value) -> mv.autoHideF3 = value);
+                .create(CTRL_X, CUR_Y, CTRL_W, 20, Component.empty(),
+                        (btn, v) -> mv.autoHideF3 = v);
         autoHideBtn.setValue(mv.autoHideF3);
-        autoHideBtn.setTooltip(Tooltip.create(Component.literal("Hide overlay while the debug screen (F3) is open.")));
-        widgets.add(autoHideBtn);
-        y += 22 + gap;
+        addRenderableWidget(autoHideBtn);
+        addTip(autoHideBtn, "Hide overlay while the debug screen (F3) is open.");
+        nextRow();
 
-        // ===== TPS Thresholds
-        labels.add(new Label(left, y + 5, Component.literal("TPS Thresholds")));
-        y += 14 + gap;
+        // ==== Divider ====
+        CUR_Y += 2;
+        nextRow();
 
-        labels.add(new Label(left, y + 5, Component.literal("Warn if TPS ≤")));
-        var tpsWarn = new EditBox(this.font, left + 140, y, (w - 140) / 2 - 4, 20, Component.empty());
+        // ===== TPS thresholds (two columns in one row) =====
+        addLabel("TPS Thresholds");
+        CUR_Y += 14; // small header spacing
+
+        int halfW = (CTRL_W - 8) / 2;
+        var tpsWarn = new EditBox(this.font, CTRL_X, CUR_Y, halfW, 20, Component.empty());
         tpsWarn.setValue(trimDouble(mv.thresh.tpsWarn));
         tpsWarn.setResponder(s -> validateDoubleBox(tpsWarn, s, v -> mv.thresh.tpsWarn = clamp(v, 0, 20)));
-        tpsWarn.setTooltip(Tooltip.create(Component.literal("TPS at or below this value is shown in 'warn' color.")));
-        widgets.add(tpsWarn);
+        addRenderableWidget(tpsWarn);
+        addTip(tpsWarn, "Warn if TPS ≤ this value.");
 
-        labels.add(new Label(left + 140 + (w - 140) / 2 + 8, y + 5, Component.literal("Bad if TPS ≤")));
-        var tpsBad = new EditBox(this.font,
-                left + 140 + (w - 140) / 2 + 8 + 90,
-                y,
-                (w - 140) - ((w - 140) / 2 + 8 + 90),
-                20,
-                Component.empty());
+        var tpsBad = new EditBox(this.font, CTRL_X + halfW + 8, CUR_Y, halfW, 20, Component.empty());
         tpsBad.setValue(trimDouble(mv.thresh.tpsBad));
         tpsBad.setResponder(s -> validateDoubleBox(tpsBad, s, v -> mv.thresh.tpsBad = clamp(v, 0, 20)));
-        tpsBad.setTooltip(Tooltip.create(Component.literal("TPS at or below this value is shown in 'bad' color.")));
-        widgets.add(tpsBad);
-        y += 22 + gap;
+        addRenderableWidget(tpsBad);
+        addTip(tpsBad, "Bad if TPS ≤ this value.");
+        nextRow();
 
-        labels.add(new Label(left, y + 5, Component.literal("TPS Colors (#RRGGBB Good/Warn/Bad)")));
-        var tpsGood = hexBox(left + 140, y, (w - 140 - 16) / 3, mv.thresh.tpsGoodColor, v -> mv.thresh.tpsGoodColor = v);
-        var tpsWarnC = hexBox(left + 140 + (w - 140 - 16) / 3 + 8, y, (w - 140 - 16) / 3, mv.thresh.tpsWarnColor, v -> mv.thresh.tpsWarnColor = v);
-        var tpsBadC = hexBox(left + 140 + 2 * ((w - 140 - 16) / 3) + 16, y, (w - 140 - 16) / 3, mv.thresh.tpsBadColor, v -> mv.thresh.tpsBadColor = v);
-        tpsGood.setTooltip(Tooltip.create(Component.literal("Color used when TPS is good (above warn).")));
-        tpsWarnC.setTooltip(Tooltip.create(Component.literal("Color used when TPS ≤ warn.")));
-        tpsBadC.setTooltip(Tooltip.create(Component.literal("Color used when TPS ≤ bad.")));
-        widgets.add(tpsGood);
-        widgets.add(tpsWarnC);
-        widgets.add(tpsBadC);
-        y += 22 + gap;
+        // colors (good / warn / bad) in one row (3 boxes)
+        var tpsGood = hexBox(CTRL_X, CUR_Y, (CTRL_W - 16) / 3, mv.thresh.tpsGoodColor, v -> mv.thresh.tpsGoodColor = v);
+        var tpsWarnC = hexBox(CTRL_X + (CTRL_W - 16) / 3 + 8, CUR_Y, (CTRL_W - 16) / 3, mv.thresh.tpsWarnColor, v -> mv.thresh.tpsWarnColor = v);
+        var tpsBadC  = hexBox(CTRL_X + 2 * ((CTRL_W - 16) / 3) + 16, CUR_Y, (CTRL_W - 16) / 3, mv.thresh.tpsBadColor,  v -> mv.thresh.tpsBadColor  = v);
+        addRenderableWidget(tpsGood);
+        addRenderableWidget(tpsWarnC);
+        addRenderableWidget(tpsBadC);
+        addTip(tpsGood, "TPS good color (#RRGGBB).");
+        addTip(tpsWarnC, "TPS warn color (#RRGGBB).");
+        addTip(tpsBadC,  "TPS bad color (#RRGGBB).");
+        nextRow();
 
-        // ===== MSPT Thresholds
-        labels.add(new Label(left, y + 5, Component.literal("MSPT Thresholds")));
-        y += 14 + gap;
+        // ===== MSPT thresholds =====
+        addLabel("MSPT Thresholds");
+        CUR_Y += 14;
 
-        labels.add(new Label(left, y + 5, Component.literal("Warn if MSPT ≥")));
-        var msptWarn = new EditBox(this.font, left + 140, y, (w - 140) / 2 - 4, 20, Component.empty());
+        var msptWarn = new EditBox(this.font, CTRL_X, CUR_Y, halfW, 20, Component.empty());
         msptWarn.setValue(trimDouble(mv.thresh.msptWarn));
         msptWarn.setResponder(s -> validateDoubleBox(msptWarn, s, v -> mv.thresh.msptWarn = clamp(v, 0, 200)));
-        msptWarn.setTooltip(Tooltip.create(Component.literal("MSPT at or above this is shown in 'warn' color.\nTarget is 50 ms.")));
-        widgets.add(msptWarn);
+        addRenderableWidget(msptWarn);
+        addTip(msptWarn, "Warn if MSPT ≥ this value. (Target is 50 ms)");
 
-        labels.add(new Label(left + 140 + (w - 140) / 2 + 8, y + 5, Component.literal("Bad if MSPT ≥")));
-        var msptBad = new EditBox(this.font,
-                left + 140 + (w - 140) / 2 + 8 + 90,
-                y,
-                (w - 140) - ((w - 140) / 2 + 8 + 90),
-                20,
-                Component.empty());
+        var msptBad = new EditBox(this.font, CTRL_X + halfW + 8, CUR_Y, halfW, 20, Component.empty());
         msptBad.setValue(trimDouble(mv.thresh.msptBad));
         msptBad.setResponder(s -> validateDoubleBox(msptBad, s, v -> mv.thresh.msptBad = clamp(v, 0, 200)));
-        msptBad.setTooltip(Tooltip.create(Component.literal("MSPT at or above this is shown in 'bad' color.")));
-        widgets.add(msptBad);
-        y += 22 + gap;
+        addRenderableWidget(msptBad);
+        addTip(msptBad, "Bad if MSPT ≥ this value.");
+        nextRow();
 
-        labels.add(new Label(left, y + 5, Component.literal("MSPT Colors (#RRGGBB Good/Warn/Bad)")));
-        var msptGood = hexBox(left + 140, y, (w - 140 - 16) / 3, mv.thresh.msptGoodColor, v -> mv.thresh.msptGoodColor = v);
-        var msptWarnC = hexBox(left + 140 + (w - 140 - 16) / 3 + 8, y, (w - 140 - 16) / 3, mv.thresh.msptWarnColor, v -> mv.thresh.msptWarnColor = v);
-        var msptBadC = hexBox(left + 140 + 2 * ((w - 140 - 16) / 3) + 16, y, (w - 140 - 16) / 3, mv.thresh.msptBadColor, v -> mv.thresh.msptBadColor = v);
-        msptGood.setTooltip(Tooltip.create(Component.literal("Color used when MSPT is good (below warn).")));
-        msptWarnC.setTooltip(Tooltip.create(Component.literal("Color used when MSPT ≥ warn.")));
-        msptBadC.setTooltip(Tooltip.create(Component.literal("Color used when MSPT ≥ bad.")));
-        widgets.add(msptGood);
-        widgets.add(msptWarnC);
-        widgets.add(msptBadC);
-        y += 22 + gap;
+        var msptGood = hexBox(CTRL_X, CUR_Y, (CTRL_W - 16) / 3, mv.thresh.msptGoodColor, v -> mv.thresh.msptGoodColor = v);
+        var msptWarnC = hexBox(CTRL_X + (CTRL_W - 16) / 3 + 8, CUR_Y, (CTRL_W - 16) / 3, mv.thresh.msptWarnColor, v -> mv.thresh.msptWarnColor = v);
+        var msptBadC  = hexBox(CTRL_X + 2 * ((CTRL_W - 16) / 3) + 16, CUR_Y, (CTRL_W - 16) / 3, mv.thresh.msptBadColor,  v -> mv.thresh.msptBadColor  = v);
+        addRenderableWidget(msptGood);
+        addRenderableWidget(msptWarnC);
+        addRenderableWidget(msptBadC);
+        addTip(msptGood, "MSPT good color (#RRGGBB).");
+        addTip(msptWarnC, "MSPT warn color (#RRGGBB).");
+        addTip(msptBadC,  "MSPT bad color (#RRGGBB).");
+        nextRow();
 
-        // ===== Buttons (Done / Reset / Cancel)
+        // ===== Buttons (Done / Reset / Cancel) =====
         int cx = this.width / 2;
         var done = Button.builder(Component.literal("Done"), b -> {
                     mv.applyTo(ConfigManager.get());
@@ -260,19 +293,29 @@ public class TpsHudConfigScreen extends Screen {
                 .bounds(cx + 55, this.height - 28, 100, 20)
                 .build();
 
-        widgets.add(done);
-        widgets.add(reset);
-        widgets.add(cancel);
-
-        widgets.forEach(this::addRenderableWidget);
-        super.init();
+        addRenderableWidget(done);
+        addRenderableWidget(reset);
+        addRenderableWidget(cancel);
     }
 
     @Override
     public void render(GuiGraphics gfx, int mouseX, int mouseY, float delta) {
         super.render(gfx, mouseX, mouseY, delta);
+
+        // Centered title
+        String title = "TPS HUD – Settings";
+        int titleW = this.font.width(title);
+        gfx.drawString(this.font, title, (this.width - titleW) / 2, TITLE_Y, 0xFFFFFF, false);
+
         for (var l : labels) {
-            gfx.drawString(this.font, l.text(), l.x(), l.y(), 0xFFFFFF, false);
+            gfx.drawString(this.font, l.text(), l.x(), l.y(), 0xE0E0E0, false);
+        }
+
+        for (var tip : tips) {
+            if (tip.widget.isMouseOver(mouseX, mouseY)) {
+                gfx.renderTooltip(this.font, tip.text, mouseX, mouseY);
+                break;
+            }
         }
     }
 
@@ -281,21 +324,10 @@ public class TpsHudConfigScreen extends Screen {
         this.minecraft.setScreen(parent);
     }
 
+    // ---------- Small utilities ----------
     private record Label(int x, int y, Component text) {}
 
-    private EditBox hexBox(int x, int y, int w, String init, java.util.function.Consumer<String> onValid) {
-        var box = new EditBox(this.font, x, y, w, 20, Component.empty());
-        box.setValue(init);
-        box.setResponder(s -> {
-            String t = s == null ? "" : s.trim().toUpperCase(Locale.ROOT);
-            if (t.startsWith("#")) t = t.substring(1);
-            boolean ok = t.matches("[0-9A-F]{6}");
-            box.setTextColor(ok ? 0xE0E0E0 : 0xFF5555);
-            if (ok) onValid.accept("#" + t);
-        });
-        box.setTooltip(Tooltip.create(Component.literal("Hex color as #RRGGBB")));
-        return box;
-    }
+    private record Tip(AbstractWidget widget, Component text) {}
 
     private static void validateDoubleBox(EditBox box, String s, java.util.function.DoubleConsumer onValid) {
         try {
@@ -307,17 +339,18 @@ public class TpsHudConfigScreen extends Screen {
         }
     }
 
-    private static String trimDouble(double v) {
-        if (Math.abs(v - Math.round(v)) < 1e-6) return String.valueOf((long) Math.round(v));
-        return String.valueOf(v);
-    }
-
-    private static double clamp(double v, double min, double max) {
-        return Math.max(min, Math.min(max, v));
-    }
-
-    private static int clampInt(int v, int min, int max) {
-        return Math.max(min, Math.min(max, v));
+    private EditBox hexBox(int x, int y, int w, String init, java.util.function.Consumer<String> onValid) {
+        var box = new EditBox(this.font, x, y, w, 20, Component.empty());
+        box.setValue(init);
+        box.setResponder(s -> {
+            String t = s == null ? "" : s.trim().toUpperCase(Locale.ROOT);
+            if (t.startsWith("#")) t = t.substring(1);
+            boolean ok = t.matches("[0-9A-F]{6}");
+            box.setTextColor(ok ? 0xE0E0E0 : 0xFF5555);
+            if (ok) onValid.accept("#" + t);
+        });
+        addTip(box, "Hex color (#RRGGBB).");
+        return box;
     }
 
     private static final class ModelView {
