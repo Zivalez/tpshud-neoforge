@@ -17,7 +17,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
-
 public class TpsHudConfigScreen extends Screen {
 
     private final Screen parent;
@@ -47,15 +46,14 @@ public class TpsHudConfigScreen extends Screen {
         int pad = 16;
         int usableW = Math.max(320, this.width - pad * 2);
 
-        // Title center
         TITLE_Y = 12;
 
-        int formW = Math.min(usableW, 380);
-        COL_LEFT_X = (this.width - formW) / 2;
-        LABEL_W = 128;
-        CTRL_X = COL_LEFT_X + LABEL_W + 12;
+        int formW = Math.min(usableW, 380); // keep it compact and neat
+        COL_LEFT_X = (this.width - formW) / 2; // center the whole form block
+        LABEL_W = 128;                         // fixed label width
+        CTRL_X = COL_LEFT_X + LABEL_W + 12;    // gap between label and control
         CTRL_W = formW - (LABEL_W + 12);
-        CUR_Y  = TITLE_Y + 24 + 10;
+        CUR_Y  = TITLE_Y + 24 + 10;            // below title
     }
 
     private void addLabel(String text) {
@@ -93,6 +91,9 @@ public class TpsHudConfigScreen extends Screen {
         if (this.mv == null) this.mv = new ModelView(ConfigManager.get());
         layoutReset();
 
+        // ===== Title (centered) =====
+        // (Drawn in render())
+
         // ===== Enabled =====
         addLabel("Enabled");
         var enabledBtn = CycleButton.booleanBuilder(Component.literal("ON"), Component.literal("OFF"))
@@ -128,17 +129,15 @@ public class TpsHudConfigScreen extends Screen {
         addTip(padBox, "Margin from the screen edges, in pixels.");
         nextRow();
 
-        // ===== Scale (%) with +/- and box in one row =====
         addLabel("Scale (%)");
-        int btnW = 22;
-        var scaleDec = Button.builder(Component.literal("-"), b -> {
-                    mv.scale = Mth.clamp(mv.scale - 0.05f, 0.5f, 2.0f);
-                    // reflect in box
-                    scaleBox.setValue(String.valueOf(Math.round(mv.scale * 100)));
-                })
-                .bounds(CTRL_X, CUR_Y, btnW, 20)
-                .build();
-        var scaleBox = new EditBox(this.font, CTRL_X + btnW + 4, CUR_Y, CTRL_W - (btnW + 4) * 2, 20, Component.empty());
+        final int btnW = 22;
+
+        final EditBox scaleBox = new EditBox(this.font,
+                CTRL_X + btnW + 4,
+                CUR_Y,
+                CTRL_W - (btnW + 4) * 2,
+                20,
+                Component.empty());
         scaleBox.setValue(String.valueOf(Math.round(mv.scale * 100)));
         scaleBox.setResponder(s -> {
             try {
@@ -149,12 +148,21 @@ public class TpsHudConfigScreen extends Screen {
                 scaleBox.setTextColor(0xFF5555);
             }
         });
+
+        var scaleDec = Button.builder(Component.literal("-"), b -> {
+                    mv.scale = Mth.clamp(mv.scale - 0.05f, 0.5f, 2.0f);
+                    scaleBox.setValue(String.valueOf(Math.round(mv.scale * 100)));
+                })
+                .bounds(CTRL_X, CUR_Y, btnW, 20)
+                .build();
+
         var scaleInc = Button.builder(Component.literal("+"), b -> {
                     mv.scale = Mth.clamp(mv.scale + 0.05f, 0.5f, 2.0f);
                     scaleBox.setValue(String.valueOf(Math.round(mv.scale * 100)));
                 })
                 .bounds(CTRL_X + CTRL_W - btnW, CUR_Y, btnW, 20)
                 .build();
+
         addRenderableWidget(scaleDec);
         addRenderableWidget(scaleBox);
         addRenderableWidget(scaleInc);
@@ -214,9 +222,9 @@ public class TpsHudConfigScreen extends Screen {
         CUR_Y += 2;
         nextRow();
 
-        // ===== TPS thresholds (two columns in one row) =====
+        // ===== TPS thresholds =====
         addLabel("TPS Thresholds");
-        CUR_Y += 14; // small header spacing
+        CUR_Y += 14;
 
         int halfW = (CTRL_W - 8) / 2;
         var tpsWarn = new EditBox(this.font, CTRL_X, CUR_Y, halfW, 20, Component.empty());
@@ -232,7 +240,6 @@ public class TpsHudConfigScreen extends Screen {
         addTip(tpsBad, "Bad if TPS ≤ this value.");
         nextRow();
 
-        // colors (good / warn / bad) in one row (3 boxes)
         var tpsGood = hexBox(CTRL_X, CUR_Y, (CTRL_W - 16) / 3, mv.thresh.tpsGoodColor, v -> mv.thresh.tpsGoodColor = v);
         var tpsWarnC = hexBox(CTRL_X + (CTRL_W - 16) / 3 + 8, CUR_Y, (CTRL_W - 16) / 3, mv.thresh.tpsWarnColor, v -> mv.thresh.tpsWarnColor = v);
         var tpsBadC  = hexBox(CTRL_X + 2 * ((CTRL_W - 16) / 3) + 16, CUR_Y, (CTRL_W - 16) / 3, mv.thresh.tpsBadColor,  v -> mv.thresh.tpsBadColor  = v);
@@ -302,7 +309,6 @@ public class TpsHudConfigScreen extends Screen {
     public void render(GuiGraphics gfx, int mouseX, int mouseY, float delta) {
         super.render(gfx, mouseX, mouseY, delta);
 
-        // Centered title
         String title = "TPS HUD – Settings";
         int titleW = this.font.width(title);
         gfx.drawString(this.font, title, (this.width - titleW) / 2, TITLE_Y, 0xFFFFFF, false);
