@@ -37,7 +37,6 @@ public final class TpsOverlay {
         TpsHudConfig cfg = ConfigManager.get();
         if (!cfg.enabled) return;
 
-
         float tps = TpsTracker.getTps();
         float mspt = TpsTracker.getMspt();
         if (Float.isNaN(tps)) return;
@@ -46,28 +45,22 @@ public final class TpsOverlay {
         String tpsStr = String.format(Locale.ROOT, "%." + prec + "f", tps);
         String msptStr = String.format(Locale.ROOT, "%." + prec + "f", mspt);
 
-        String line1;
-        String line2 = null;
-
         int tpsColor = pickTpsColor(cfg, tps);
         int msptColor = pickMsptColor(cfg, mspt);
-
-        switch (cfg.format) {
-            case TPS -> line1 = "TPS: " + tpsStr;
-            case MSPT -> line1 = "MSPT: " + msptStr;
-            default -> {
-                if (cfg.displayMode == TpsHudConfig.Mode.COMPACT) {
-                    line1 = "TPS " + tpsStr + " | MSPT " + msptStr;
-                } else {
-                    line1 = "TPS: " + tpsStr;
-                    line2 = "MSPT: " + msptStr;
-                }
-            }
-        }
 
         Font font = mc.font;
         int sw = mc.getWindow().getGuiScaledWidth();
         int sh = mc.getWindow().getGuiScaledHeight();
+
+        String line1, line2 = null;
+        switch (cfg.format) {
+            case TPS -> line1 = "TPS: " + tpsStr;
+            case MSPT -> line1 = "MSPT: " + msptStr;
+            default -> {
+                line1 = "TPS: " + tpsStr;
+                line2 = "MSPT: " + msptStr;
+            }
+        }
 
         int w = font.width(line1);
         int h = font.lineHeight;
@@ -107,19 +100,16 @@ public final class TpsOverlay {
             gfx.drawString(font, "MSPT: ", 0, 0, cfg.textColor, cfg.shadow);
             int labelW = font.width("MSPT: ");
             gfx.drawString(font, msptStr, labelW, 0, msptColor, cfg.shadow);
-        } else if (cfg.displayMode == TpsHudConfig.Mode.COMPACT) {
-            gfx.drawString(font, line1, 0, 0, cfg.textColor, cfg.shadow);
         } else {
+            // BOTH
             gfx.drawString(font, "TPS: ", 0, 0, cfg.textColor, cfg.shadow);
-            int labelW = font.width("TPS: ");
-            gfx.drawString(font, tpsStr, labelW, 0, tpsColor, cfg.shadow);
-        }
+            int l1 = font.width("TPS: ");
+            gfx.drawString(font, tpsStr, l1, 0, tpsColor, cfg.shadow);
 
-        if (line2 != null) {
             int y2 = font.lineHeight + 2;
             gfx.drawString(font, "MSPT: ", 0, y2, cfg.textColor, cfg.shadow);
-            int lbl = font.width("MSPT: ");
-            gfx.drawString(font, msptStr, lbl, y2, msptColor, cfg.shadow);
+            int l2 = font.width("MSPT: ");
+            gfx.drawString(font, msptStr, l2, y2, msptColor, cfg.shadow);
         }
 
         gfx.pose().popPose();

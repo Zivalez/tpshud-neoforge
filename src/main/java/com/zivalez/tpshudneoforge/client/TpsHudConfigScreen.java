@@ -4,12 +4,12 @@ import com.zivalez.tpshudneoforge.config.ConfigManager;
 import com.zivalez.tpshudneoforge.config.TpsHudConfig;
 import com.zivalez.tpshudneoforge.config.TpsHudConfig.Anchor;
 import com.zivalez.tpshudneoforge.config.TpsHudConfig.Format;
-import com.zivalez.tpshudneoforge.config.TpsHudConfig.Mode;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.CycleButton;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.AbstractWidget;
+import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
@@ -35,8 +35,9 @@ public class TpsHudConfigScreen extends Screen {
         widgets.clear();
         labels.clear();
 
-        TpsHudConfig cfg = ConfigManager.get();
-        this.mv = new ModelView(cfg);
+        if (this.mv == null) {
+            this.mv = new ModelView(ConfigManager.get());
+        }
 
         int left = this.width / 2 - 160;
         int y = 28;
@@ -54,6 +55,7 @@ public class TpsHudConfigScreen extends Screen {
                 .create(left + 140, y, w - 140, 20, Component.empty(),
                         (btn, value) -> mv.enabled = value);
         enabledBtn.setValue(mv.enabled);
+        enabledBtn.setTooltip(Tooltip.create(Component.literal("Show or hide the TPS HUD overlay.")));
         widgets.add(enabledBtn);
         y += 22 + gap;
 
@@ -65,6 +67,7 @@ public class TpsHudConfigScreen extends Screen {
                 .create(left + 140, y, w - 140, 20, Component.empty(),
                         (btn, value) -> mv.anchor = value);
         anchorBtn.setValue(mv.anchor);
+        anchorBtn.setTooltip(Tooltip.create(Component.literal("Choose which screen corner the HUD attaches to.")));
         widgets.add(anchorBtn);
         y += 22 + gap;
 
@@ -76,6 +79,7 @@ public class TpsHudConfigScreen extends Screen {
             try { mv.padding = clampInt(Integer.parseInt(s.trim()), 0, 64); padBox.setTextColor(0xE0E0E0); }
             catch (Exception ex) { padBox.setTextColor(0xFF5555); }
         });
+        padBox.setTooltip(Tooltip.create(Component.literal("Margin from the screen edges, in pixels.")));
         widgets.add(padBox);
         y += 22 + gap;
 
@@ -98,6 +102,7 @@ public class TpsHudConfigScreen extends Screen {
                 scaleBox.setTextColor(0xFF5555);
             }
         });
+        scaleBox.setTooltip(Tooltip.create(Component.literal("HUD size multiplier in percent (50%–200%).")));
 
         var scaleInc = Button.builder(Component.literal("+"), b -> {
                     mv.scale = Mth.clamp(mv.scale + 0.05f, 0.5f, 2.0f);
@@ -118,6 +123,7 @@ public class TpsHudConfigScreen extends Screen {
                 .create(left + 140, y, w - 140, 20, Component.empty(),
                         (btn, value) -> mv.precision = value);
         precisionBtn.setValue(mv.precision);
+        precisionBtn.setTooltip(Tooltip.create(Component.literal("Number of decimal places for TPS/MSPT values.")));
         widgets.add(precisionBtn);
         y += 22 + gap;
 
@@ -129,6 +135,12 @@ public class TpsHudConfigScreen extends Screen {
                 .create(left + 140, y, w - 140, 20, Component.empty(),
                         (btn, value) -> mv.format = value);
         formatBtn.setValue(mv.format);
+        formatBtn.setTooltip(Tooltip.create(Component.literal("""
+        Show TPS only, MSPT only, or BOTH:
+        • TPS: ticks per second (target 20).
+        • MSPT: ms per tick (lower is better, target 50 ms).
+        • BOTH: show both on separate lines.
+        """)));
         widgets.add(formatBtn);
         y += 22 + gap;
 
@@ -140,6 +152,7 @@ public class TpsHudConfigScreen extends Screen {
             try { mv.smoothingWindow = clampInt(Integer.parseInt(s.trim()), 5, 240); smoothBox.setTextColor(0xE0E0E0); }
             catch (Exception ex) { smoothBox.setTextColor(0xFF5555); }
         });
+        smoothBox.setTooltip(Tooltip.create(Component.literal("Moving average window size.\nLarger = smoother but slower to react.")));
         widgets.add(smoothBox);
         y += 22 + gap;
 
@@ -150,18 +163,8 @@ public class TpsHudConfigScreen extends Screen {
                 .create(left + 140, y, w - 140, 20, Component.empty(),
                         (btn, value) -> mv.autoHideF3 = value);
         autoHideBtn.setValue(mv.autoHideF3);
+        autoHideBtn.setTooltip(Tooltip.create(Component.literal("Hide overlay while the debug screen (F3) is open.")));
         widgets.add(autoHideBtn);
-        y += 22 + gap;
-
-        // ===== Mode
-        labels.add(new Label(left, y + 5, Component.literal("Display Mode")));
-        var modeBtn = CycleButton.<Mode>builder(v -> Component.literal(v.name()))
-                .withValues(Mode.values())
-                .displayOnlyValue()
-                .create(left + 140, y, w - 140, 20, Component.empty(),
-                        (btn, value) -> mv.displayMode = value);
-        modeBtn.setValue(mv.displayMode);
-        widgets.add(modeBtn);
         y += 22 + gap;
 
         // ===== TPS Thresholds
@@ -172,6 +175,7 @@ public class TpsHudConfigScreen extends Screen {
         var tpsWarn = new EditBox(this.font, left + 140, y, (w - 140) / 2 - 4, 20, Component.empty());
         tpsWarn.setValue(trimDouble(mv.thresh.tpsWarn));
         tpsWarn.setResponder(s -> validateDoubleBox(tpsWarn, s, v -> mv.thresh.tpsWarn = clamp(v, 0, 20)));
+        tpsWarn.setTooltip(Tooltip.create(Component.literal("TPS at or below this value is shown in 'warn' color.")));
         widgets.add(tpsWarn);
 
         labels.add(new Label(left + 140 + (w - 140) / 2 + 8, y + 5, Component.literal("Bad if TPS ≤")));
@@ -183,6 +187,7 @@ public class TpsHudConfigScreen extends Screen {
                 Component.empty());
         tpsBad.setValue(trimDouble(mv.thresh.tpsBad));
         tpsBad.setResponder(s -> validateDoubleBox(tpsBad, s, v -> mv.thresh.tpsBad = clamp(v, 0, 20)));
+        tpsBad.setTooltip(Tooltip.create(Component.literal("TPS at or below this value is shown in 'bad' color.")));
         widgets.add(tpsBad);
         y += 22 + gap;
 
@@ -190,6 +195,9 @@ public class TpsHudConfigScreen extends Screen {
         var tpsGood = hexBox(left + 140, y, (w - 140 - 16) / 3, mv.thresh.tpsGoodColor, v -> mv.thresh.tpsGoodColor = v);
         var tpsWarnC = hexBox(left + 140 + (w - 140 - 16) / 3 + 8, y, (w - 140 - 16) / 3, mv.thresh.tpsWarnColor, v -> mv.thresh.tpsWarnColor = v);
         var tpsBadC = hexBox(left + 140 + 2 * ((w - 140 - 16) / 3) + 16, y, (w - 140 - 16) / 3, mv.thresh.tpsBadColor, v -> mv.thresh.tpsBadColor = v);
+        tpsGood.setTooltip(Tooltip.create(Component.literal("Color used when TPS is good (above warn).")));
+        tpsWarnC.setTooltip(Tooltip.create(Component.literal("Color used when TPS ≤ warn.")));
+        tpsBadC.setTooltip(Tooltip.create(Component.literal("Color used when TPS ≤ bad.")));
         widgets.add(tpsGood);
         widgets.add(tpsWarnC);
         widgets.add(tpsBadC);
@@ -203,6 +211,7 @@ public class TpsHudConfigScreen extends Screen {
         var msptWarn = new EditBox(this.font, left + 140, y, (w - 140) / 2 - 4, 20, Component.empty());
         msptWarn.setValue(trimDouble(mv.thresh.msptWarn));
         msptWarn.setResponder(s -> validateDoubleBox(msptWarn, s, v -> mv.thresh.msptWarn = clamp(v, 0, 200)));
+        msptWarn.setTooltip(Tooltip.create(Component.literal("MSPT at or above this is shown in 'warn' color.\nTarget is 50 ms.")));
         widgets.add(msptWarn);
 
         labels.add(new Label(left + 140 + (w - 140) / 2 + 8, y + 5, Component.literal("Bad if MSPT ≥")));
@@ -214,6 +223,7 @@ public class TpsHudConfigScreen extends Screen {
                 Component.empty());
         msptBad.setValue(trimDouble(mv.thresh.msptBad));
         msptBad.setResponder(s -> validateDoubleBox(msptBad, s, v -> mv.thresh.msptBad = clamp(v, 0, 200)));
+        msptBad.setTooltip(Tooltip.create(Component.literal("MSPT at or above this is shown in 'bad' color.")));
         widgets.add(msptBad);
         y += 22 + gap;
 
@@ -221,39 +231,49 @@ public class TpsHudConfigScreen extends Screen {
         var msptGood = hexBox(left + 140, y, (w - 140 - 16) / 3, mv.thresh.msptGoodColor, v -> mv.thresh.msptGoodColor = v);
         var msptWarnC = hexBox(left + 140 + (w - 140 - 16) / 3 + 8, y, (w - 140 - 16) / 3, mv.thresh.msptWarnColor, v -> mv.thresh.msptWarnColor = v);
         var msptBadC = hexBox(left + 140 + 2 * ((w - 140 - 16) / 3) + 16, y, (w - 140 - 16) / 3, mv.thresh.msptBadColor, v -> mv.thresh.msptBadColor = v);
+        msptGood.setTooltip(Tooltip.create(Component.literal("Color used when MSPT is good (below warn).")));
+        msptWarnC.setTooltip(Tooltip.create(Component.literal("Color used when MSPT ≥ warn.")));
+        msptBadC.setTooltip(Tooltip.create(Component.literal("Color used when MSPT ≥ bad.")));
         widgets.add(msptGood);
         widgets.add(msptWarnC);
         widgets.add(msptBadC);
         y += 22 + gap;
 
-        // ===== Buttons
+        // ===== Buttons (Done / Reset / Cancel)
+        int cx = this.width / 2;
         var done = Button.builder(Component.literal("Done"), b -> {
                     mv.applyTo(ConfigManager.get());
                     ConfigManager.save();
                     onClose();
                 })
-                .bounds(this.width / 2 - 155, this.height - 28, 150, 20)
+                .bounds(cx - 155, this.height - 28, 100, 20)
+                .build();
+
+        var reset = Button.builder(Component.literal("Reset"), b -> {
+                    this.mv = new ModelView(new TpsHudConfig());
+                    this.init();
+                })
+                .bounds(cx - 50, this.height - 28, 100, 20)
                 .build();
 
         var cancel = Button.builder(Component.literal("Cancel"), b -> onClose())
-                .bounds(this.width / 2 + 5, this.height - 28, 150, 20)
+                .bounds(cx + 55, this.height - 28, 100, 20)
                 .build();
 
         widgets.add(done);
+        widgets.add(reset);
         widgets.add(cancel);
 
-        // Add all widgets to screen
         widgets.forEach(this::addRenderableWidget);
         super.init();
     }
 
     @Override
     public void render(GuiGraphics gfx, int mouseX, int mouseY, float delta) {
-        this.renderBackground(gfx, mouseX, mouseY, delta);
+        super.render(gfx, mouseX, mouseY, delta);
         for (var l : labels) {
             gfx.drawString(this.font, l.text(), l.x(), l.y(), 0xFFFFFF, false);
         }
-        super.render(gfx, mouseX, mouseY, delta);
     }
 
     @Override
@@ -273,10 +293,11 @@ public class TpsHudConfigScreen extends Screen {
             box.setTextColor(ok ? 0xE0E0E0 : 0xFF5555);
             if (ok) onValid.accept("#" + t);
         });
+        box.setTooltip(Tooltip.create(Component.literal("Hex color as #RRGGBB")));
         return box;
     }
 
-    private static void validateDoubleBox(EditBox box, String s, java.util.function.Consumer<Double> onValid) {
+    private static void validateDoubleBox(EditBox box, String s, java.util.function.DoubleConsumer onValid) {
         try {
             double v = Double.parseDouble(s.trim());
             box.setTextColor(0xE0E0E0);
@@ -299,7 +320,6 @@ public class TpsHudConfigScreen extends Screen {
         return Math.max(min, Math.min(max, v));
     }
 
-    /** View-model ringan untuk edit lalu apply ke ConfigManager */
     private static final class ModelView {
         public boolean enabled;
         public Anchor anchor;
@@ -309,7 +329,6 @@ public class TpsHudConfigScreen extends Screen {
         public Format format;
         public int smoothingWindow;
         public boolean autoHideF3;
-        public Mode displayMode;
         public final TpsHudConfig.Thresholds thresh = new TpsHudConfig.Thresholds();
 
         ModelView(TpsHudConfig src) {
@@ -321,7 +340,6 @@ public class TpsHudConfigScreen extends Screen {
             this.format = src.format;
             this.smoothingWindow = src.smoothingWindow;
             this.autoHideF3 = src.autoHideF3;
-            this.displayMode = src.displayMode;
 
             this.thresh.tpsWarn = src.thresholds.tpsWarn;
             this.thresh.tpsBad = src.thresholds.tpsBad;
@@ -345,7 +363,6 @@ public class TpsHudConfigScreen extends Screen {
             dst.format = format;
             dst.smoothingWindow = smoothingWindow;
             dst.autoHideF3 = autoHideF3;
-            dst.displayMode = displayMode;
 
             dst.thresholds.tpsWarn = thresh.tpsWarn;
             dst.thresholds.tpsBad = thresh.tpsBad;
