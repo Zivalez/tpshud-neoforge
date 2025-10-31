@@ -299,6 +299,7 @@ public class TpsHudConfigScreen extends Screen {
         return Math.max(min, Math.min(max, v));
     }
 
+    /** View-model ringan untuk edit lalu apply ke ConfigManager */
     private static final class ModelView {
         public boolean enabled;
         public Anchor anchor;

@@ -10,12 +10,10 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 import net.minecraft.util.StringUtil;
-import net.minecraft.util.Unit;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.RegisterGuiLayersEvent;
-import net.neoforged.neoforge.client.event.RenderGuiLayerEvent;
 
 import java.util.Locale;
 
@@ -23,24 +21,13 @@ import java.util.Locale;
 public final class TpsOverlay {
 
     private static final ResourceLocation LAYER_ID =
-            new ResourceLocation(tpshudneoforge.MODID, "tps_hud");
+            ResourceLocation.fromNamespaceAndPath(tpshudneoforge.MODID, "tps_hud");
 
     private TpsOverlay() {}
 
     @SubscribeEvent
     public static void onRegisterLayers(RegisterGuiLayersEvent event) {
-        event.registerAboveAll(LAYER_ID, (GuiGraphics gfx, net.minecraft.util.DeltaTracker delta) -> {
-            render(gfx);
-            return Unit.INSTANCE;
-        });
-    }
-
-    @EventBusSubscriber(modid = tpshudneoforge.MODID, value = Dist.CLIENT, bus = EventBusSubscriber.Bus.GAME)
-    public static final class FallbackRender {
-        @SubscribeEvent
-        public static void onRenderGui(RenderGuiLayerEvent.Post e) {
-            render(e.getGuiGraphics());
-        }
+        event.registerAboveAll(LAYER_ID, (gfx, delta) -> render(gfx));
     }
 
     public static void render(GuiGraphics gfx) {
@@ -49,6 +36,7 @@ public final class TpsOverlay {
 
         TpsHudConfig cfg = ConfigManager.get();
         if (!cfg.enabled) return;
+
 
         float tps = TpsTracker.getTps();
         float mspt = TpsTracker.getMspt();
@@ -61,7 +49,6 @@ public final class TpsOverlay {
         String line1;
         String line2 = null;
 
-        // Colors by threshold
         int tpsColor = pickTpsColor(cfg, tps);
         int msptColor = pickMsptColor(cfg, mspt);
 
@@ -79,10 +66,9 @@ public final class TpsOverlay {
         }
 
         Font font = mc.font;
-        int sw = gfx.guiWidth();
-        int sh = gfx.guiHeight();
+        int sw = mc.getWindow().getGuiScaledWidth();
+        int sh = mc.getWindow().getGuiScaledHeight();
 
-        // Measure text
         int w = font.width(line1);
         int h = font.lineHeight;
         if (!StringUtil.isNullOrEmpty(line2)) {
@@ -113,7 +99,6 @@ public final class TpsOverlay {
             gfx.fill(-bgPad, -bgPad, -bgPad + bgW, -bgPad + bgH, 0x66000000);
         }
 
-        // Draw first line (with value recolor for non-compact layouts)
         if (cfg.format == TpsHudConfig.Format.TPS) {
             gfx.drawString(font, "TPS: ", 0, 0, cfg.textColor, cfg.shadow);
             int labelW = font.width("TPS: ");
@@ -130,7 +115,6 @@ public final class TpsOverlay {
             gfx.drawString(font, tpsStr, labelW, 0, tpsColor, cfg.shadow);
         }
 
-        // Second line for BOTH + DETAIL
         if (line2 != null) {
             int y2 = font.lineHeight + 2;
             gfx.drawString(font, "MSPT: ", 0, y2, cfg.textColor, cfg.shadow);
