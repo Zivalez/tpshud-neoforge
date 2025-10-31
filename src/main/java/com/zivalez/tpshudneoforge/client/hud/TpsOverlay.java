@@ -16,7 +16,6 @@ import net.neoforged.neoforge.client.event.RegisterGuiLayersEvent;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.util.Locale;
 
 @EventBusSubscriber(modid = tpshudneoforge.MODID, value = Dist.CLIENT, bus = EventBusSubscriber.Bus.MOD)
 public final class TpsOverlay {
@@ -46,17 +45,28 @@ public final class TpsOverlay {
         float msptRaw = TpsTracker.getMspt();
         if (Float.isNaN(tpsRaw)) return;
 
-        int prec = Mth.clamp(cfg.precision, 0, 3);
+        int sw = mc.getWindow().getGuiScaledWidth();
+        int sh = mc.getWindow().getGuiScaledHeight();
 
-        // ---- Build strings with hard cap for TPS (never > 20.00 even with rounding) ----
+        drawOverlay(gfx, cfg, tpsRaw, msptRaw, sw, sh);
+    }
+
+    public static void renderPreview(GuiGraphics gfx, TpsHudConfig cfg, float tpsRaw, float msptRaw, int sw, int sh) {
+        if (!cfg.enabled) return;
+        drawOverlay(gfx, cfg, tpsRaw, msptRaw, sw, sh);
+    }
+
+    // --- Shared drawing logic ------------------------------------------------------------
+    private static void drawOverlay(GuiGraphics gfx, TpsHudConfig cfg, float tpsRaw, float msptRaw, int sw, int sh) {
+        Font font = Minecraft.getInstance().font;
+
+        int prec = Mth.clamp(cfg.precision, 0, 3);
         String tpsStr = formatCapped(tpsRaw, TPS_CAP, prec);
         String msptStr = formatNumber(msptRaw, prec);
 
-        // Colors based
         int tpsColor = pickTpsColor(cfg, tpsRaw);
         int msptColor = pickMsptColor(cfg, msptRaw);
 
-        Font font = mc.font;
         String line1 = switch (cfg.format) {
             case TPS -> "TPS: " + tpsStr;
             case MSPT -> "MSPT: " + msptStr;
@@ -71,34 +81,34 @@ public final class TpsOverlay {
             h = font.lineHeight * 2 + 2;
         }
 
-        int sw = mc.getWindow().getGuiScaledWidth();
-        int sh = mc.getWindow().getGuiScaledHeight();
         int pad = Math.max(0, cfg.padding);
         float scale = Mth.clamp(cfg.scale, 0.5f, 2.0f);
 
-        int drawX = 0, drawY = 0;
-        int pivotX = pad, pivotY = pad;
+        int drawX;
+        int drawY;
+        int pivotX;
+        int pivotY;
 
         switch (cfg.anchor) {
-            case TOP_LEFT -> { // pivot at top-left
+            case TOP_LEFT -> {
                 pivotX = pad;
                 pivotY = pad;
                 drawX = 0;
                 drawY = 0;
             }
-            case TOP_RIGHT -> { // pivot at top-right
+            case TOP_RIGHT -> {
                 pivotX = sw - pad;
                 pivotY = pad;
                 drawX = -w;
                 drawY = 0;
             }
-            case BOTTOM_LEFT -> { // pivot at bottom-left
+            case BOTTOM_LEFT -> {
                 pivotX = pad;
                 pivotY = sh - pad;
                 drawX = 0;
                 drawY = -h;
             }
-            case BOTTOM_RIGHT -> { // pivot at bottom-right
+            default -> {
                 pivotX = sw - pad;
                 pivotY = sh - pad;
                 drawX = -w;
@@ -121,19 +131,16 @@ public final class TpsOverlay {
         }
 
         if (cfg.format == TpsHudConfig.Format.TPS) {
-            // TPS only
             String label = "TPS: ";
             int labelW = font.width(label);
             gfx.drawString(font, label, drawX, drawY, cfg.textColor, cfg.shadow);
             gfx.drawString(font, stripSign(tpsStr), drawX + labelW, drawY, tpsColor, cfg.shadow);
         } else if (cfg.format == TpsHudConfig.Format.MSPT) {
-            // MSPT only
             String label = "MSPT: ";
             int labelW = font.width(label);
             gfx.drawString(font, label, drawX, drawY, cfg.textColor, cfg.shadow);
             gfx.drawString(font, stripSign(msptStr), drawX + labelW, drawY, msptColor, cfg.shadow);
         } else {
-            // BOTH
             String label1 = "TPS: ";
             int l1 = font.width(label1);
             gfx.drawString(font, label1, drawX, drawY, cfg.textColor, cfg.shadow);
@@ -149,8 +156,7 @@ public final class TpsOverlay {
         gfx.pose().popPose();
     }
 
-    // --- Helpers ------------------------------------------------------------------------
-
+    // --- Utils --------------------------------------------------------------------------
     private static String formatCapped(float value, double cap, int precision) {
         double v = Math.min(value, cap);
         BigDecimal bd = BigDecimal.valueOf(v).setScale(precision, RoundingMode.HALF_UP);
@@ -160,8 +166,7 @@ public final class TpsOverlay {
     }
 
     private static String formatNumber(float value, int precision) {
-        BigDecimal bd = BigDecimal.valueOf(value).setScale(precision, RoundingMode.HALF_UP);
-        return bd.toPlainString();
+        return BigDecimal.valueOf(value).setScale(precision, RoundingMode.HALF_UP).toPlainString();
     }
 
     private static String stripSign(String s) {
