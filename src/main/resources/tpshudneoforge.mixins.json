@@ -1,11 +1,10 @@
 {
-  "required": true,
-  "minVersion": "0.8",
+  "required": false,
+  "minVersion": "0.8.5",
   "package": "com.zivalez.tpshudneoforge.mixin",
   "compatibilityLevel": "JAVA_21",
-  "client": [
-    "ClientPacketListenerMixin"
-  ],
+  "client": [],
+  "mixins": [],
   "injectors": {
     "defaultRequire": 1
   }
